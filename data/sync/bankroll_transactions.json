@@ -2,8 +2,8 @@
   {
     "id": 121,
     "tx_type": "INITIAL",
-    "amount": 1200.0,
-    "balance_after": 1200.0,
+    "amount": 100.0,
+    "balance_after": 100.0,
     "sport": "general",
     "stake": 0.0,
     "odds": 1.0,

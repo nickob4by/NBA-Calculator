@@ -1,1 +1,17 @@
-[]
+[
+  {
+    "id": 28,
+    "sport": "mlb",
+    "matchup": "Chicago Cubs vs Cincinnati Reds",
+    "team_selected": "Cincinnati Reds",
+    "stake": 1.0,
+    "odds": 2.55,
+    "model_prob": 0.4177,
+    "edge_pct": 0.0473,
+    "status": "PENDING",
+    "pnl": 0.0,
+    "placed_at": "2026-08-28 07:50:32",
+    "resolved_at": null,
+    "note": ""
+  }
+]
