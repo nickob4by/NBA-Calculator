@@ -77,16 +77,17 @@ def fetch_mlb_season_schedule(season: str) -> pd.DataFrame:
         logger.warning(f"Error fetching from MLB StatsAPI for {season}: {e}")
         return pd.DataFrame()
 
-DEFAULT_MLB_5YR_SEASONS = ["2020", "2021", "2022", "2023", "2024"]
+DEFAULT_MLB_5YR_SEASONS = ["2020", "2021", "2022", "2023", "2024", "2025"]
 
 def generate_mlb_seed_dataset_if_empty(seasons: List[str] = DEFAULT_MLB_5YR_SEASONS) -> int:
     """
-    Generates realistic 5-year historical MLB dataset seed across seasons (2020-2024)
+    Generates realistic 6-year historical MLB dataset seed across seasons (2020-2025)
     with realistic baseball runs distributions, pitcher/batter sabermetrics, and 162-game schedule.
     """
     count = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb'")["c"]
-    if count >= 10000:
-        logger.info(f"Database already contains {count} MLB games. Skipping seed generation.")
+    has_2025 = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb' AND season='2025'")["c"] > 0
+    if count >= 14000 and has_2025:
+        logger.info(f"Database already contains {count} MLB games including 2025. Skipping seed generation.")
         return count
 
     logger.info(f"Generating comprehensive realistic 5-season MLB seed dataset ({', '.join(seasons)})...")
