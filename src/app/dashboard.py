@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 from pathlib import Path
 
 # Add project root to sys.path
@@ -278,7 +278,7 @@ with tab_analytics:
 with tab_backtest:
     st.subheader(f"📈 {sport.upper()} Historical Simulation & Performance Metrics")
     
-    season_options = ["All Seasons", "2024", "2023", "2022"] if sport == "mlb" else ["All Seasons", "2024-25", "2023-24", "2022-23"]
+    season_options = ["All Seasons", "2024", "2023", "2022", "2021", "2020"] if sport == "mlb" else ["All Seasons", "2024-25", "2023-24", "2022-23", "2021-22", "2020-21"]
     market_options = ["moneyline", "spread", "total"]
 
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
