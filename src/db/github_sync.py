@@ -128,12 +128,20 @@ class GitHubDataSync:
         return restored_any
 
     @staticmethod
-    def push_to_github(commit_msg: str = "sync: update bankroll, wagers, and user settings") -> Tuple[bool, str]:
+    def push_to_github(commit_msg: str = "sync: update website code, bankroll, and user settings", include_all_code: bool = True) -> Tuple[bool, str]:
+        """
+        Exports database snapshot and stages all website code + data changes,
+        then commits and pushes to GitHub repository.
+        """
         try:
             counts = GitHubDataSync.export_data_snapshot()
             project_dir = str(config.PROJECT_ROOT)
 
-            subprocess.run(["git", "add", "data/sync/"], cwd=project_dir, check=True, capture_output=True, text=True)
+            # Stage data sync and any modified website code files
+            if include_all_code:
+                subprocess.run(["git", "add", "."], cwd=project_dir, check=True, capture_output=True, text=True)
+            else:
+                subprocess.run(["git", "add", "data/sync/"], cwd=project_dir, check=True, capture_output=True, text=True)
 
             commit_res = subprocess.run(
                 ["git", "commit", "-m", commit_msg],
@@ -152,13 +160,17 @@ class GitHubDataSync:
             if push_res.returncode != 0 and "Everything up-to-date" not in push_res.stderr and "nothing to commit" not in commit_res.stdout:
                 return False, f"Git push failed: {push_res.stderr or push_res.stdout}"
 
-            return True, f"Successfully pushed data to GitHub! ({counts.get('transactions', 0)} transactions, {counts.get('bets', 0)} bets synced)"
+            return True, f"Successfully pushed website updates and data to GitHub! ({counts.get('transactions', 0)} transactions, {counts.get('bets', 0)} bets synced)"
 
         except Exception as e:
             return False, f"Error during GitHub push: {str(e)}"
 
     @staticmethod
     def pull_from_github() -> Tuple[bool, str]:
+        """
+        Pulls latest website codebase updates and data snapshots from GitHub,
+        then restores data into the local SQLite database.
+        """
         try:
             project_dir = str(config.PROJECT_ROOT)
 
@@ -172,7 +184,12 @@ class GitHubDataSync:
             if pull_res.returncode != 0:
                 return False, f"Git pull failed: {pull_res.stderr or pull_res.stdout}"
 
+            pull_output = (pull_res.stdout or "").strip()
             restored = GitHubDataSync.import_data_snapshot_if_exists()
-            return True, f"Successfully pulled from GitHub! (Data reloaded: {'Yes' if restored else 'Up-to-date'})"
+
+            if "Already up to date." in pull_output:
+                return True, "Website and data are already up-to-date with GitHub."
+            else:
+                return True, f"Website code and data updated successfully from GitHub! ({pull_output.splitlines()[-1] if pull_output else 'Fast-forward'})"
         except Exception as e:
             return False, f"Error during GitHub pull: {str(e)}"

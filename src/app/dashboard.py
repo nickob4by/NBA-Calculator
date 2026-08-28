@@ -820,21 +820,21 @@ elif nav_selection == "Data & Settings":
             st.rerun()
 
     st.markdown("---")
-    st.markdown("##### GitHub Cloud Data Persistence & Multi-PC Sync")
-    st.caption("Sync your starting balance, ledger history, open bets, and settings with GitHub so your data is persistent when cloning to other PCs.")
+    st.markdown("##### GitHub Cloud Website & Data Sync")
+    st.caption("Synchronize both your website code and betting data across multiple PCs with 1 click.")
 
     sync_c1, sync_c2 = st.columns(2)
     with sync_c1:
         st.markdown("""
         <div class="card-neutral" style="padding: 16px; margin-bottom: 12px;">
-            <div style="font-weight: 700; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">Backup Data to GitHub</div>
+            <div style="font-weight: 700; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">⬆️ Push Website & Data to GitHub</div>
             <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
-                Exports your bankroll, ledger, wagers, and user settings, then automatically commits and pushes them to your GitHub repository.
+                Backs up your bankroll, bets history, and all code changes, then commits and pushes them to your GitHub repository.
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Backup & Push Data to GitHub", type="primary", key="btn_push_github"):
-            with st.spinner("Pushing data snapshot to GitHub..."):
+        if st.button("Push Website & Data to GitHub", type="primary", key="btn_push_github"):
+            with st.spinner("Pushing codebase and data snapshot to GitHub..."):
                 ok, msg = GitHubDataSync.push_to_github()
                 if ok:
                     st.session_state["bet_notification"] = f"Cloud Sync: {msg}"
@@ -845,17 +845,18 @@ elif nav_selection == "Data & Settings":
     with sync_c2:
         st.markdown("""
         <div class="card-neutral" style="padding: 16px; margin-bottom: 12px;">
-            <div style="font-weight: 700; color: #34d399; font-size: 14px; margin-bottom: 6px;">Pull & Sync Data from GitHub</div>
+            <div style="font-weight: 700; color: #34d399; font-size: 14px; margin-bottom: 6px;">⬇️ Update Website & Pull from GitHub</div>
             <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
-                Pulls the latest snapshot from GitHub and restores your bankroll, bets, and settings into this computer's database.
+                Pulls the latest website code updates, UI improvements, and betting data from GitHub and refreshes the application.
             </div>
         </div>
         """, unsafe_allow_html=True)
-        if st.button("Pull & Sync Data from GitHub", key="btn_pull_github"):
-            with st.spinner("Pulling data snapshot from GitHub..."):
+        if st.button("Update Website & Pull from GitHub", key="btn_pull_github"):
+            with st.spinner("Pulling website updates and data from GitHub..."):
                 ok, msg = GitHubDataSync.pull_from_github()
                 if ok:
                     st.cache_resource.clear()
+                    st.cache_data.clear()
                     st.session_state["bet_notification"] = f"Cloud Sync: {msg}"
                     st.rerun()
                 else:
