@@ -7,6 +7,7 @@ load_dotenv()
 
 # Base paths
 BASE_DIR = Path(__file__).resolve().parent
+PROJECT_ROOT = BASE_DIR
 DATA_DIR = BASE_DIR / "data"
 MODELS_DIR = DATA_DIR / "models"
 CACHE_DIR = DATA_DIR / "cache"

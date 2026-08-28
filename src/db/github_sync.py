@@ -135,7 +135,7 @@ class GitHubDataSync:
         """
         try:
             counts = GitHubDataSync.export_data_snapshot()
-            project_dir = str(config.PROJECT_ROOT)
+            project_dir = str(getattr(config, "PROJECT_ROOT", getattr(config, "BASE_DIR", Path(__file__).resolve().parent.parent.parent)))
 
             # Stage data sync and any modified website code files
             if include_all_code:
@@ -172,7 +172,7 @@ class GitHubDataSync:
         then restores data into the local SQLite database.
         """
         try:
-            project_dir = str(config.PROJECT_ROOT)
+            project_dir = str(getattr(config, "PROJECT_ROOT", getattr(config, "BASE_DIR", Path(__file__).resolve().parent.parent.parent)))
 
             pull_res = subprocess.run(
                 ["git", "pull", "origin", "main"],

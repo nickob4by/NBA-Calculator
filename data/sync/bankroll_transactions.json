@@ -1,14 +1,14 @@
 [
   {
-    "id": 88,
+    "id": 98,
     "tx_type": "INITIAL",
-    "amount": 1200.0,
-    "balance_after": 1200.0,
+    "amount": 100.0,
+    "balance_after": 100.0,
     "sport": "general",
     "stake": 0.0,
     "odds": 1.0,
     "team_selected": "",
     "note": "Starting Capital",
-    "created_at": "2026-08-28 07:35:41"
+    "created_at": "2026-08-28 07:37:53"
   }
 ]
