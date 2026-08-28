@@ -283,13 +283,13 @@ with tab_backtest:
 
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
     with b_col1:
-        bt_season = st.selectbox("Season Filter", options=season_options, index=1)
+        bt_season = st.selectbox("Season Filter", options=season_options, index=1, key=f"bt_season_filter_{sport}")
     with b_col2:
-        bt_compound = st.checkbox("Dynamic Compounding Bankroll", value=False)
+        bt_compound = st.checkbox("Dynamic Compounding Bankroll", value=False, key=f"bt_compound_{sport}")
     with b_col3:
-        bt_markets = st.multiselect("Active Markets", options=market_options, default=market_options)
+        bt_markets = st.multiselect("Active Markets", options=market_options, default=market_options, key=f"bt_markets_{sport}")
     with b_col4:
-        run_btn = st.button("Run Simulation", type="primary")
+        run_btn = st.button("Run Simulation", type="primary", key=f"bt_run_btn_{sport}")
 
     season_arg = None if bt_season == "All Seasons" else bt_season
 
@@ -306,12 +306,12 @@ with tab_backtest:
         res = bt.run_backtest(season_filter=season_arg)
 
     r1, r2, r3, r4, r5, r6 = st.columns(6)
-    r1.metric("Total Wagers", f"{res['total_bets']:,}")
-    r2.metric("Win Rate", f"{res['win_rate']}%", f"{res['wins']}W - {res['losses']}L")
-    r3.metric("Net Profit ($)", f"${res['pnl']:,.2f}")
-    r4.metric("ROI (%)", f"{res['roi_pct']:+.2f}%")
-    r5.metric("Max Drawdown", f"{res['max_drawdown_pct']:.2f}%", f"${res['max_drawdown_dollars']:,.2f}")
-    r6.metric("Beat Closing Line", f"{res['beat_closing_pct']}%", f"Avg CLV: {res['avg_clv_pct']:+.2f}%")
+    r1.metric("Total Wagers", f"{res.get('total_bets', 0):,}")
+    r2.metric("Win Rate", f"{res.get('win_rate', 0.0)}%", f"{res.get('wins', 0)}W - {res.get('losses', 0)}L")
+    r3.metric("Net Profit ($)", f"${res.get('pnl', 0.0):,.2f}")
+    r4.metric("ROI (%)", f"{res.get('roi_pct', 0.0):+.2f}%")
+    r5.metric("Max Drawdown", f"{res.get('max_drawdown_pct', 0.0):.2f}%", f"${res.get('max_drawdown_dollars', 0.0):,.2f}")
+    r6.metric("Beat Closing Line", f"{res.get('beat_closing_pct', 0.0)}%", f"Avg CLV: {res.get('avg_clv_pct', 0.0):+.2f}%")
 
     if res["equity_curve"]:
         eq_df = pd.DataFrame(res["equity_curve"])

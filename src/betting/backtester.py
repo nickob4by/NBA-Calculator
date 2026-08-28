@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import pandas as pd
 import numpy as np
 from typing import Dict, List, Optional
@@ -79,9 +79,24 @@ class HistoricalBacktester:
 
         if merged.empty:
             return {
-                "total_bets": 0, "win_rate": 0.0, "pnl": 0.0, "roi_pct": 0.0,
-                "final_bankroll": self.starting_bankroll, "max_drawdown_pct": 0.0,
-                "sharpe_ratio": 0.0, "avg_clv_pct": 0.0, "equity_curve": [], "bets": []
+                "sport": self.sport,
+                "total_bets": 0,
+                "wins": 0,
+                "losses": 0,
+                "pushes": 0,
+                "win_rate": 0.0,
+                "total_staked": 0.0,
+                "pnl": 0.0,
+                "roi_pct": 0.0,
+                "starting_bankroll": self.starting_bankroll,
+                "final_bankroll": self.starting_bankroll,
+                "max_drawdown_pct": 0.0,
+                "max_drawdown_dollars": 0.0,
+                "sharpe_ratio": 0.0,
+                "avg_clv_pct": 0.0,
+                "beat_closing_pct": 0.0,
+                "equity_curve": [],
+                "bets": []
             }
 
         feature_cols = get_feature_columns(merged)
@@ -243,9 +258,24 @@ class HistoricalBacktester:
         bets_df = pd.DataFrame(all_bets)
         if bets_df.empty:
             return {
-                "total_bets": 0, "win_rate": 0.0, "pnl": 0.0, "roi_pct": 0.0,
-                "final_bankroll": self.starting_bankroll, "max_drawdown_pct": 0.0,
-                "sharpe_ratio": 0.0, "avg_clv_pct": 0.0, "equity_curve": equity_curve, "bets": []
+                "sport": self.sport,
+                "total_bets": 0,
+                "wins": 0,
+                "losses": 0,
+                "pushes": 0,
+                "win_rate": 0.0,
+                "total_staked": 0.0,
+                "pnl": 0.0,
+                "roi_pct": 0.0,
+                "starting_bankroll": self.starting_bankroll,
+                "final_bankroll": self.starting_bankroll,
+                "max_drawdown_pct": 0.0,
+                "max_drawdown_dollars": 0.0,
+                "sharpe_ratio": 0.0,
+                "avg_clv_pct": 0.0,
+                "beat_closing_pct": 0.0,
+                "equity_curve": equity_curve,
+                "bets": []
             }
 
         total_bets = len(bets_df)
