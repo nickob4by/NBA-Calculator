@@ -1,4 +1,4 @@
-﻿import sys
+import sys
 import json
 from pathlib import Path
 import streamlit as st
@@ -108,7 +108,7 @@ def load_sport_models_and_data(target_sport: str):
     from src.features.four_factors import compute_advanced_stats_dataframe
     from src.features.mlb_sabermetrics import compute_mlb_sabermetrics_dataframe
     from src.features.situational import compute_situational_features
-    from src.features.rolling_features import compute_rolling_team_features
+    from src.features.rolling_metrics import compute_rolling_team_features
     
     if target_sport == "mlb":
         adv_df = compute_mlb_sabermetrics_dataframe(logs_df)
