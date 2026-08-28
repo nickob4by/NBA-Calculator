@@ -130,24 +130,13 @@ kelly_mult = st.session_state["kelly_mult"]
 min_edge_pct = st.session_state["min_edge_pct"]
 
 # ================= TOP HEADER BAR =================
-head_c1, head_c2, head_c3 = st.columns([2.6, 1.2, 1.2], vertical_alignment="center")
+head_c1, head_c2 = st.columns([3.2, 1.2], vertical_alignment="center")
 
 with head_c1:
     st.markdown("<h2 style='margin:0; padding:0; color:#f8fafc; font-weight:800; font-size:clamp(20px, 3vw, 26px);'>QUANTITATIVE ANALYTICS</h2>", unsafe_allow_html=True)
     st.caption("NBA & MLB Statistical Valuation Engine")
 
 with head_c2:
-    sport_choice = st.selectbox(
-        "Sport",
-        options=["NBA (Basketball)", "MLB (Baseball)"],
-        index=0,
-        label_visibility="collapsed",
-        key="sport_header_select"
-    )
-    sport = "mlb" if "MLB" in sport_choice else "nba"
-    sport_label = "MLB" if sport == "mlb" else "NBA"
-
-with head_c3:
     st.markdown(f"""
     <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; text-align: center;">
         <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Balance: </span>
@@ -213,57 +202,94 @@ def load_sport_models_and_data(target_sport: str):
             
     return margin_model, totals_model, win_model, matchups_df, rolled_logs, metrics
 
-margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = load_sport_models_and_data(sport)
-teams_dict = config.MLB_TEAMS if sport == "mlb" else config.NBA_TEAMS
-team_list = list(teams_dict.keys())
-team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in teams_dict.items()}
-
-default_home_idx = 28 if sport == "mlb" else 1
-default_away_idx = 3 if sport == "mlb" else 13
-
 # ================= 1. MATCHUP FORECAST =================
 if nav_selection == "Matchup Forecast":
-    st.title(f"{sport_label} Matchup Forecast & Valuation")
-    
-    col_h, col_a = st.columns(2)
-    with col_h:
-        home_team_id = st.selectbox(f"Home Team ({sport_label})", options=team_list, format_func=lambda x: team_options[x], index=min(default_home_idx, len(team_list)-1))
-    with col_a:
-        away_team_id = st.selectbox(f"Away Team ({sport_label})", options=team_list, format_func=lambda x: team_options[x], index=min(default_away_idx, len(team_list)-1))
+    st.markdown("<h2 style='color:#f8fafc; font-weight:700; margin-bottom: 4px;'>Matchup Forecast & Valuation</h2>", unsafe_allow_html=True)
+    st.caption("Select the league and competing teams to generate win probabilities, compare odds, and find value bets.")
 
-    if home_team_id == away_team_id:
-        st.warning("Please select two distinct teams for the matchup.")
+    # Matchup Selection Card
+    st.markdown("""
+    <div class="card-neutral" style="margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+            Configure Matchup
+        </div>
+    """, unsafe_allow_html=True)
+
+    mc_sport_col, mc_h_col, mc_a_col = st.columns([1.2, 1.4, 1.4])
+    with mc_sport_col:
+        sport_choice = st.radio(
+            "League",
+            options=["NBA Basketball", "MLB Baseball"],
+            index=0,
+            key="matchup_sport_choice"
+        )
+        sport = "mlb" if "MLB" in sport_choice else "nba"
+        sport_label = "MLB" if sport == "mlb" else "NBA"
+
+    margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = load_sport_models_and_data(sport)
+    teams_dict = config.MLB_TEAMS if sport == "mlb" else config.NBA_TEAMS
+    team_list = list(teams_dict.keys())
+    team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in teams_dict.items()}
+
+    with mc_h_col:
+        home_team_id = st.selectbox(
+            f"Home Team ({sport_label})",
+            options=[None] + team_list,
+            format_func=lambda x: "-- Select Home Team --" if x is None else team_options[x],
+            index=0,
+            key=f"mf_home_team_{sport}"
+        )
+
+    with mc_a_col:
+        away_team_id = st.selectbox(
+            f"Away Team ({sport_label})",
+            options=[None] + team_list,
+            format_func=lambda x: "-- Select Away Team --" if x is None else team_options[x],
+            index=0,
+            key=f"mf_away_team_{sport}"
+        )
+
+    home_sp_fip = None
+    away_sp_fip = None
+    if sport == "mlb" and home_team_id is not None and away_team_id is not None:
+        from src.features.mlb_pitcher_metrics import get_team_starters
+        st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
+        sp_c1, sp_c2 = st.columns(2)
+        h_starters = get_team_starters(home_team_id)
+        a_starters = get_team_starters(away_team_id)
+
+        with sp_c1:
+            h_sp_idx = st.selectbox(
+                f"{config.get_team_abbrev(home_team_id, sport='mlb')} Starting Pitcher",
+                options=range(len(h_starters)),
+                format_func=lambda i: f"{h_starters[i]['name']} ({h_starters[i]['fip']:.2f} FIP | {h_starters[i]['whip']:.2f} WHIP)",
+                key=f"h_sp_{home_team_id}"
+            )
+            home_sp_fip = h_starters[h_sp_idx]["fip"]
+
+        with sp_c2:
+            a_sp_idx = st.selectbox(
+                f"{config.get_team_abbrev(away_team_id, sport='mlb')} Starting Pitcher",
+                options=range(len(a_starters)),
+                format_func=lambda i: f"{a_starters[i]['name']} ({a_starters[i]['fip']:.2f} FIP | {a_starters[i]['whip']:.2f} WHIP)",
+                key=f"a_sp_{away_team_id}"
+            )
+            away_sp_fip = a_starters[a_sp_idx]["fip"]
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if home_team_id is None or away_team_id is None:
+        st.markdown("""
+        <div class="card-slate" style="text-align: center; padding: 40px 20px; border-style: dashed;">
+            <h4 style="color: #cbd5e1; margin: 0 0 6px 0;">No Matchup Selected</h4>
+            <div style="color: #64748b; font-size: 13px;">
+                Choose the league and select both Home and Away teams in the card above to calculate win probabilities and value edges.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif home_team_id == away_team_id:
+        st.warning("Please select two distinct competing teams.")
     else:
-        home_sp_fip = None
-        away_sp_fip = None
-        if sport == "mlb":
-            from src.features.mlb_pitcher_metrics import get_team_starters
-            st.markdown("##### Starting Pitchers")
-            sp_col1, sp_col2 = st.columns(2)
-            
-            h_starters = get_team_starters(home_team_id)
-            a_starters = get_team_starters(away_team_id)
-            
-            with sp_col1:
-                h_sp_idx = st.selectbox(
-                    f"{config.get_team_abbrev(home_team_id, sport='mlb')} Starter",
-                    options=range(len(h_starters)),
-                    format_func=lambda i: f"{h_starters[i]['name']} ({h_starters[i]['fip']:.2f} FIP | {h_starters[i]['whip']:.2f} WHIP)",
-                    key="home_sp_select"
-                )
-                h_selected_sp = h_starters[h_sp_idx]
-                home_sp_fip = h_selected_sp["fip"]
-
-            with sp_col2:
-                a_sp_idx = st.selectbox(
-                    f"{config.get_team_abbrev(away_team_id, sport='mlb')} Starter",
-                    options=range(len(a_starters)),
-                    format_func=lambda i: f"{a_starters[i]['name']} ({a_starters[i]['fip']:.2f} FIP | {a_starters[i]['whip']:.2f} WHIP)",
-                    key="away_sp_select"
-                )
-                a_selected_sp = a_starters[a_sp_idx]
-                away_sp_fip = a_selected_sp["fip"]
-
         eval_row = build_upcoming_matchup(home_team_id, away_team_id, logs_df, sport=sport, home_sp_fip=home_sp_fip, away_sp_fip=away_sp_fip)
         feature_cols = margin_model.feature_names
         X = eval_row[feature_cols]
@@ -506,33 +532,64 @@ elif nav_selection == "Bankroll & Ledger":
 
 # ================= 3. TEAM EXPLORER =================
 elif nav_selection == "Team Explorer":
-    st.title(f"{sport_label} Team & Rotation Explorer")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        t1_sel = st.selectbox("Team 1", options=team_list, format_func=lambda x: team_options[x], index=default_home_idx, key="exp_t1")
-    with col2:
-        t2_sel = st.selectbox("Team 2", options=team_list, format_func=lambda x: team_options[x], index=default_away_idx, key="exp_t2")
+    st.markdown("<h2 style='color:#f8fafc; font-weight:700; margin-bottom: 4px;'>Team & Rotation Explorer</h2>", unsafe_allow_html=True)
+    st.caption("Inspect team starting rotations (MLB) and Four Factors advanced metrics (NBA).")
 
-    if sport == "mlb":
+    st.markdown("""
+    <div class="card-neutral" style="margin-bottom: 16px;">
+        <div style="font-size: 13px; font-weight: 700; color: #94a3b8; text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 12px;">
+            Select Teams to Inspect
+        </div>
+    """, unsafe_allow_html=True)
+
+    exp_sport_col, exp_t1_col, exp_t2_col = st.columns([1.2, 1.4, 1.4])
+    with exp_sport_col:
+        exp_sport_choice = st.radio("League", options=["NBA Basketball", "MLB Baseball"], index=0, key="exp_sport_choice")
+        exp_sport = "mlb" if "MLB" in exp_sport_choice else "nba"
+        exp_sport_label = "MLB" if exp_sport == "mlb" else "NBA"
+
+    exp_margin, exp_totals, exp_win, exp_matchups, exp_logs, _ = load_sport_models_and_data(exp_sport)
+    exp_teams = config.MLB_TEAMS if exp_sport == "mlb" else config.NBA_TEAMS
+    exp_team_list = list(exp_teams.keys())
+    exp_team_opts = {k: f"{v['name']} ({v['abbrev']})" for k, v in exp_teams.items()}
+
+    with exp_t1_col:
+        t1_sel = st.selectbox(f"Team 1 ({exp_sport_label})", options=[None] + exp_team_list, format_func=lambda x: "-- Select Team 1 --" if x is None else exp_team_opts[x], index=0, key=f"exp_t1_{exp_sport}")
+    with exp_t2_col:
+        t2_sel = st.selectbox(f"Team 2 ({exp_sport_label})", options=[None] + exp_team_list, format_func=lambda x: "-- Select Team 2 (Optional) --" if x is None else exp_team_opts[x], index=0, key=f"exp_t2_{exp_sport}")
+
+    st.markdown("</div>", unsafe_allow_html=True)
+
+    if t1_sel is None:
+        st.markdown("""
+        <div class="card-slate" style="text-align: center; padding: 40px 20px; border-style: dashed;">
+            <h4 style="color: #cbd5e1; margin: 0 0 6px 0;">No Team Selected</h4>
+            <div style="color: #64748b; font-size: 13px;">
+                Choose the league and pick at least one team above to inspect rotations and metrics.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    elif exp_sport == "mlb":
         from src.features.mlb_pitcher_metrics import get_team_starters
         t1_rot = get_team_starters(t1_sel)
-        t2_rot = get_team_starters(t2_sel)
 
-        p_col1, p_col2 = st.columns(2)
-        with p_col1:
+        if t2_sel is not None:
+            t2_rot = get_team_starters(t2_sel)
+            p_col1, p_col2 = st.columns(2)
+            with p_col1:
+                st.markdown(f"**{config.get_team_name(t1_sel, sport='mlb')} Starting Rotation**")
+                st.dataframe(pd.DataFrame(t1_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
+            with p_col2:
+                st.markdown(f"**{config.get_team_name(t2_sel, sport='mlb')} Starting Rotation**")
+                st.dataframe(pd.DataFrame(t2_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
+        else:
             st.markdown(f"**{config.get_team_name(t1_sel, sport='mlb')} Starting Rotation**")
             st.dataframe(pd.DataFrame(t1_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
-        with p_col2:
-            st.markdown(f"**{config.get_team_name(t2_sel, sport='mlb')} Starting Rotation**")
-            st.dataframe(pd.DataFrame(t2_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
     else:
-        t1_logs = matchups_df[matchups_df["home_team_id"] == t1_sel].iloc[-1:]
-        t2_logs = matchups_df[matchups_df["home_team_id"] == t2_sel].iloc[-1:]
+        t1_logs = exp_matchups[exp_matchups["home_team_id"] == t1_sel].iloc[-1:]
 
-        if not t1_logs.empty and not t2_logs.empty:
+        if not t1_logs.empty:
             t1_row = t1_logs.iloc[0]
-            t2_row = t2_logs.iloc[0]
             categories = ['eFG% (Shooting)', 'TOV% (Ball Security)', 'ORB% (Rebounding)', 'FTR (Free Throws)', 'Net Rating']
             t1_vals = [
                 float(t1_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
@@ -541,18 +598,30 @@ elif nav_selection == "Team Explorer":
                 float(t1_row.get("home_roll_ftr_w10", 0.22)) * 100,
                 float(t1_row.get("home_roll_net_rating_w10", 3.0)) + 50
             ]
-            t2_vals = [
-                float(t2_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
-                (1.0 - float(t2_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
-                float(t2_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
-                float(t2_row.get("home_roll_ftr_w10", 0.22)) * 100,
-                float(t2_row.get("home_roll_net_rating_w10", 3.0)) + 50
-            ]
 
             fig = go.Figure()
             fig.add_trace(go.Scatterpolar(r=t1_vals, theta=categories, fill='toself', name=config.get_team_name(t1_sel, sport="nba")))
-            fig.add_trace(go.Scatterpolar(r=t2_vals, theta=categories, fill='toself', name=config.get_team_name(t2_sel, sport="nba")))
-            fig.update_layout(template="plotly_dark", polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="Four Factors Radar Comparison (10-Game Form)")
+
+            if t2_sel is not None:
+                t2_logs = exp_matchups[exp_matchups["home_team_id"] == t2_sel].iloc[-1:]
+                if not t2_logs.empty:
+                    t2_row = t2_logs.iloc[0]
+                    t2_vals = [
+                        float(t2_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
+                        (1.0 - float(t2_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
+                        float(t2_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
+                        float(t2_row.get("home_roll_ftr_w10", 0.22)) * 100,
+                        float(t2_row.get("home_roll_net_rating_w10", 3.0)) + 50
+                    ]
+                    fig.add_trace(go.Scatterpolar(r=t2_vals, theta=categories, fill='toself', name=config.get_team_name(t2_sel, sport="nba")))
+
+            fig.update_layout(
+                template="plotly_dark",
+                polar=dict(radialaxis=dict(visible=True, range=[0, 100])),
+                showlegend=True,
+                title="Four Factors Radar Comparison (10-Game Form)",
+                margin=dict(l=20, r=20, t=30, b=20)
+            )
             st.plotly_chart(fig, use_container_width=True)
 
 # ================= 4. DATA & SETTINGS =================
