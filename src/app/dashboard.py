@@ -82,6 +82,24 @@ def load_sport_models_and_data(target_sport: str):
         metrics_path = config.MODELS_DIR / "model_metrics.json"
 
     logs_df = db.fetch_df("SELECT * FROM team_game_logs WHERE sport=? ORDER BY game_date, game_id", (target_sport,))
+    
+    # Pre-calculate rolled features once and cache in memory
+    from src.features.four_factors import compute_advanced_stats_dataframe
+    from src.features.mlb_sabermetrics import compute_mlb_sabermetrics_dataframe
+    from src.features.situational import compute_situational_features
+    from src.features.rolling_features import compute_rolling_team_features
+    
+    if target_sport == "mlb":
+        adv_df = compute_mlb_sabermetrics_dataframe(logs_df)
+        adv_cols = [c for c in adv_df.columns if c not in logs_df.columns or c in ["game_id", "team_id", "opponent_id", "sport"]]
+        rolled_logs = logs_df.merge(adv_df[adv_cols], on=["game_id", "team_id", "opponent_id", "sport"], how="left")
+    else:
+        adv_df = compute_advanced_stats_dataframe(logs_df)
+        adv_cols = [c for c in adv_df.columns if c not in logs_df.columns or c in ["game_id", "team_id", "opponent_id"]]
+        rolled_logs = logs_df.merge(adv_df[adv_cols], on=["game_id", "team_id", "opponent_id"], how="left")
+
+    rolled_logs = compute_situational_features(rolled_logs)
+    rolled_logs = compute_rolling_team_features(rolled_logs)
     matchups_df = build_full_feature_dataset(logs_df, sport=target_sport)
     
     metrics = {}
@@ -89,7 +107,7 @@ def load_sport_models_and_data(target_sport: str):
         with open(metrics_path, "r", encoding="utf-8") as f:
             metrics = json.load(f)
             
-    return margin_model, totals_model, win_model, matchups_df, logs_df, metrics
+    return margin_model, totals_model, win_model, matchups_df, rolled_logs, metrics
 
 margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = load_sport_models_and_data(sport)
 
@@ -343,6 +361,18 @@ with tab_analytics:
             fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="NBA Four Factors Radar Comparison (10-Game Form)")
             st.plotly_chart(fig, use_container_width=True)
 
+@st.cache_data(show_spinner=False)
+def run_cached_backtest(target_sport, bankroll, kelly, min_edge, compound, markets_tuple, season_val):
+    bt = HistoricalBacktester(
+        sport=target_sport,
+        starting_bankroll=bankroll,
+        kelly_fraction=kelly,
+        min_edge=min_edge,
+        compound_bankroll=compound,
+        markets=list(markets_tuple)
+    )
+    return bt.run_backtest(season_filter=season_val)
+
 # ================= TAB 3: HISTORICAL BACKTEST =================
 with tab_backtest:
     st.subheader(f"📈 {sport.upper()} Historical Simulation & Performance Metrics")
@@ -361,18 +391,7 @@ with tab_backtest:
         run_btn = st.button("Run Simulation", type="primary", key=f"bt_run_btn_{sport}")
 
     season_arg = None if bt_season == "All Seasons" else bt_season
-
-    bt = HistoricalBacktester(
-        sport=sport,
-        starting_bankroll=bankroll_val,
-        kelly_fraction=kelly_mult,
-        min_edge=min_edge_pct,
-        compound_bankroll=bt_compound,
-        markets=bt_markets
-    )
-    
-    with st.spinner(f"Simulating {sport.upper()} historical wagers chronologically..."):
-        res = bt.run_backtest(season_filter=season_arg)
+    res = run_cached_backtest(sport, bankroll_val, kelly_mult, min_edge_pct, bt_compound, tuple(bt_markets), season_arg)
 
     r1, r2, r3, r4, r5, r6 = st.columns(6)
     r1.metric("Total Wagers", f"{res.get('total_bets', 0):,}")
