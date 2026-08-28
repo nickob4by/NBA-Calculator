@@ -99,11 +99,18 @@ class HistoricalBacktester:
                 "bets": []
             }
 
-        feature_cols = get_feature_columns(merged)
-        X = merged[feature_cols]
+        for c in margin_model.feature_names:
+            if c not in merged.columns:
+                merged[c] = 0.0
+        X_margin = merged[margin_model.feature_names]
 
-        pred_margins = margin_model.predict(X)
-        pred_totals = totals_model.predict(X)
+        for c in totals_model.feature_names:
+            if c not in merged.columns:
+                merged[c] = 0.0
+        X_totals = merged[totals_model.feature_names]
+
+        pred_margins = margin_model.predict(X_margin)
+        pred_totals = totals_model.predict(X_totals)
         pred_win_probs = win_model.predict_proba(predicted_margins=pred_margins, sigma=margin_model.residual_std)
 
         bankroll = self.starting_bankroll
