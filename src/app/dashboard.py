@@ -59,8 +59,18 @@ st.markdown("""
     footer { visibility: hidden !important; }
     
     /* Global Base */
-    .main { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
+    html, body, [data-testid="stAppViewContainer"], .stApp, .main {
+        background-color: #0b0f19 !important;
+        color: #f8fafc !important;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
     .stSelectbox, .stNumberInput, .stSlider { color: #f8fafc; }
+    
+    /* Accessible high-contrast captions (>= 4.5:1 ratio) */
+    .stCaption, [data-testid="stCaptionContainer"] > p, [data-testid="stCaptionContainer"] {
+        color: #cbd5e1 !important;
+        font-size: 13px !important;
+    }
     
     /* Full-width container with proper top clearance */
     .block-container {
@@ -71,13 +81,13 @@ st.markdown("""
     }
 
     div[data-testid="stMetricValue"] { font-size: clamp(18px, 3vw, 26px); font-weight: 700; color: #f8fafc; }
-    div[data-testid="stMetricLabel"] { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }
+    div[data-testid="stMetricLabel"] { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #cbd5e1 !important; font-weight: 600; }
     
     .card-neutral { background-color: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
     .card-emerald { background-color: #06281e; border: 1px solid #059669; border-radius: 8px; padding: 18px; margin-bottom: 12px; }
     .card-slate { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
     
-    /* Top Horizontal Header Navigation Menu */
+    /* Top Horizontal Header Navigation Menu & Radio Buttons */
     div[data-testid="stRadio"] > div {
         display: flex !important;
         flex-direction: row !important;
@@ -98,6 +108,12 @@ st.markdown("""
         min-width: 140px;
         justify-content: center;
     }
+    div[data-testid="stRadio"] label p,
+    div[data-testid="stRadio"] label span,
+    div[data-testid="stRadio"] label div {
+        color: #f1f5f9 !important;
+        font-weight: 500;
+    }
     div[data-testid="stRadio"] label:hover {
         background-color: #1f2937;
         border-color: #374151;
@@ -106,11 +122,23 @@ st.markdown("""
     div[data-testid="stRadio"] label:has(input:checked) {
         background-color: #064e3b !important;
         border-color: #10b981 !important;
-        color: #ecfdf5 !important;
         font-weight: 600;
+    }
+    div[data-testid="stRadio"] label[data-checked="true"] p,
+    div[data-testid="stRadio"] label[data-checked="true"] span,
+    div[data-testid="stRadio"] label:has(input:checked) p,
+    div[data-testid="stRadio"] label:has(input:checked) span {
+        color: #ffffff !important;
+        font-weight: 700 !important;
     }
     div[data-testid="stRadio"] input[type="radio"] {
         display: none !important;
+    }
+    div[data-testid="stRadio"] label:focus-visible,
+    button:focus-visible,
+    a:focus-visible {
+        outline: 2px solid #10b981 !important;
+        outline-offset: 2px !important;
     }
 
     @media (max-width: 768px) {
@@ -320,7 +348,7 @@ if nav_selection == "Matchup Forecast":
         st.markdown("""
         <div class="card-slate" style="text-align: center; padding: 40px 20px; border-style: dashed;">
             <h4 style="color: #cbd5e1; margin: 0 0 6px 0;">No Matchup Selected</h4>
-            <div style="color: #64748b; font-size: 13px;">
+            <div style="color: #cbd5e1; font-size: 13px;">
                 Choose the league and select both Home and Away teams in the card above to calculate win probabilities and value edges.
             </div>
         </div>
@@ -778,7 +806,7 @@ elif nav_selection == "Team Explorer":
         st.markdown("""
         <div class="card-slate" style="text-align: center; padding: 40px 20px; border-style: dashed;">
             <h4 style="color: #cbd5e1; margin: 0 0 6px 0;">No Team Selected</h4>
-            <div style="color: #64748b; font-size: 13px;">
+            <div style="color: #cbd5e1; font-size: 13px;">
                 Choose the league and pick at least one team above to inspect rotations and metrics.
             </div>
         </div>
