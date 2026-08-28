@@ -117,8 +117,6 @@ nav_selection = st.sidebar.radio(
         "Matchup Forecast",
         "Bankroll & Ledger",
         "Team Explorer",
-        "Backtest Simulation",
-        "Model Diagnostics",
         "Data & Settings"
     ],
     index=0
@@ -516,96 +514,7 @@ elif nav_selection == "Team Explorer":
             fig.update_layout(template="plotly_dark", polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="Four Factors Radar Comparison (10-Game Form)")
             st.plotly_chart(fig, use_container_width=True)
 
-# ================= 4. BACKTEST SIMULATION =================
-elif nav_selection == "Backtest Simulation":
-    st.title(f"{sport_label} Historical Backtest Simulation")
-    
-    season_options = ["All Seasons", "2024", "2023", "2022", "2021", "2020"] if sport == "mlb" else ["All Seasons", "2024-25", "2023-24", "2022-23", "2021-22", "2020-21"]
-    market_options = ["moneyline", "spread", "total"]
-
-    b_col1, b_col2, b_col3, b_col4 = st.columns(4)
-    with b_col1:
-        bt_season = st.selectbox("Season Filter", options=season_options, index=1, key=f"bt_season_filter_{sport}")
-    with b_col2:
-        bt_compound = st.checkbox("Dynamic Compounding", value=False, key=f"bt_compound_{sport}")
-    with b_col3:
-        bt_markets = st.multiselect("Markets", options=market_options, default=["moneyline"], key=f"bt_markets_{sport}")
-    with b_col4:
-        run_btn = st.button("Run Simulation", type="primary", key=f"bt_run_btn_{sport}")
-
-    @st.cache_data(show_spinner=False)
-    def run_cached_backtest(target_sport, bankroll, kelly, min_edge, compound, markets_tuple, season_val):
-        bt = HistoricalBacktester(
-            sport=target_sport,
-            starting_bankroll=bankroll,
-            kelly_fraction=kelly,
-            min_edge=min_edge,
-            compound_bankroll=compound,
-            markets=list(markets_tuple)
-        )
-        return bt.run_backtest(season_filter=season_val)
-
-    season_arg = None if bt_season == "All Seasons" else bt_season
-    res = run_cached_backtest(sport, active_bankroll, kelly_mult, min_edge_pct, bt_compound, tuple(bt_markets), season_arg)
-
-    r1, r2, r3, r4 = st.columns(4)
-    r1.metric("Total Wagers", f"{res.get('total_bets', 0):,}")
-    r2.metric("Win Rate", f"{res.get('win_rate', 0.0)}%", f"{res.get('wins', 0)}W - {res.get('losses', 0)}L")
-    r3.metric(f"Net Profit ({config.DEFAULT_CURRENCY})", f"{config.DEFAULT_CURRENCY}{res.get('pnl', 0.0):,.2f}")
-    r4.metric("ROI (%)", f"{res.get('roi_pct', 0.0):+.2f}%")
-
-    r5, r6 = st.columns(2)
-    r5.metric("Max Drawdown", f"{res.get('max_drawdown_pct', 0.0):.2f}%", f"{config.DEFAULT_CURRENCY}{res.get('max_drawdown_dollars', 0.0):,.2f}")
-    r6.metric("Beat Closing Line", f"{res.get('beat_closing_pct', 0.0)}%", f"Avg CLV: {res.get('avg_clv_pct', 0.0):+.2f}%")
-
-    if res["equity_curve"]:
-        eq_df = pd.DataFrame(res["equity_curve"])
-        fig_equity = px.line(
-            eq_df, x="game_date", y="bankroll",
-            labels={"game_date": "Date", "bankroll": f"Bankroll ({config.DEFAULT_CURRENCY})"}
-        )
-        fig_equity.update_traces(line=dict(color="#10b981", width=2.5))
-        fig_equity.update_layout(
-            template="plotly_dark",
-            plot_bgcolor="#0b0f19",
-            paper_bgcolor="#0b0f19",
-            margin=dict(l=20, r=20, t=30, b=20)
-        )
-        st.plotly_chart(fig_equity, use_container_width=True)
-
-    if res["bets"]:
-        st.markdown("##### Chronological Simulated Bet Log")
-        st.dataframe(pd.DataFrame(res["bets"]).tail(100), use_container_width=True)
-
-# ================= 5. MODEL DIAGNOSTICS =================
-elif nav_selection == "Model Diagnostics":
-    st.title(f"{sport_label} Calibration & Model Diagnostics")
-    
-    if model_metrics:
-        d1, d2, d3, d4 = st.columns(4)
-        d1.metric("Log Loss", str(model_metrics.get("win_probability_metrics", {}).get("log_loss", "N/A")))
-        d2.metric("Brier Score", str(model_metrics.get("win_probability_metrics", {}).get("brier_score", "N/A")))
-        d3.metric("Accuracy", f"{model_metrics.get('win_probability_metrics', {}).get('accuracy', 0)*100:.1f}%")
-        d4.metric("Margin MAE", f"{model_metrics.get('margin_metrics', {}).get('mae', 'N/A')}")
-
-        rel_bins = model_metrics.get("win_probability_metrics", {}).get("reliability_bins", [])
-        if rel_bins:
-            b_df = pd.DataFrame(rel_bins)
-            fig_rel = go.Figure()
-            fig_rel.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Perfect Calibration", line=dict(dash="dash", color="gray")))
-            fig_rel.add_trace(go.Scatter(x=b_df["confidence"], y=b_df["accuracy"], mode="lines+markers", name=f"{sport.upper()} Model Calibration", line=dict(color="#10b981", width=3)))
-            fig_rel.update_layout(
-                template="plotly_dark",
-                plot_bgcolor="#0b0f19",
-                paper_bgcolor="#0b0f19",
-                xaxis_title="Forecast Confidence (Predicted Probability)",
-                yaxis_title="Empirical Win Frequency",
-                xaxis=dict(range=[0, 1]),
-                yaxis=dict(range=[0, 1])
-            )
-            st.plotly_chart(fig_rel, use_container_width=True)
-
-# ================= 6. DATA & SETTINGS =================
+# ================= 4. DATA & SETTINGS =================
 elif nav_selection == "Data & Settings":
     st.title("Data Ingestion & Settings")
     
