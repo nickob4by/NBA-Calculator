@@ -45,19 +45,22 @@ if "custom_bankroll" not in st.session_state:
 # Sleek Minimalist Full-Width & Top Navigation CSS
 st.markdown("""
 <style>
-    /* Hide sidebar and toggle completely */
+    /* Hide Streamlit top header toolbar and sidebar completely */
+    header[data-testid="stHeader"] { display: none !important; height: 0px !important; }
     [data-testid="stSidebar"], section[data-testid="stSidebar"] { display: none !important; }
     [data-testid="collapsedControl"], button[kind="header"] { display: none !important; }
+    #MainMenu { visibility: hidden !important; }
+    footer { visibility: hidden !important; }
     
     /* Global Base */
     .main { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .stSelectbox, .stNumberInput, .stSlider { color: #f8fafc; }
     
-    /* Full-width container */
+    /* Full-width container with proper top clearance */
     .block-container {
-        padding-top: 1.25rem !important;
-        padding-bottom: 2rem !important;
-        max-width: 1280px !important;
+        padding-top: 2.5rem !important;
+        padding-bottom: 3rem !important;
+        max-width: 1200px !important;
         margin: 0 auto !important;
     }
 
@@ -106,7 +109,9 @@ st.markdown("""
 
     @media (max-width: 768px) {
         .block-container {
-            padding: 1rem 0.5rem !important;
+            padding-top: 1.5rem !important;
+            padding-left: 0.75rem !important;
+            padding-right: 0.75rem !important;
         }
         .card-emerald, .card-slate, .card-neutral {
             padding: 12px !important;
@@ -125,10 +130,10 @@ kelly_mult = st.session_state["kelly_mult"]
 min_edge_pct = st.session_state["min_edge_pct"]
 
 # ================= TOP HEADER BAR =================
-head_c1, head_c2, head_c3 = st.columns([2.6, 1.2, 1.2])
+head_c1, head_c2, head_c3 = st.columns([2.6, 1.2, 1.2], vertical_alignment="center")
 
 with head_c1:
-    st.markdown("<h3 style='margin:0; padding:0; color:#ffffff;'>QUANTITATIVE ANALYTICS</h3>", unsafe_allow_html=True)
+    st.markdown("<h2 style='margin:0; padding:0; color:#f8fafc; font-weight:800; font-size:clamp(20px, 3vw, 26px);'>QUANTITATIVE ANALYTICS</h2>", unsafe_allow_html=True)
     st.caption("NBA & MLB Statistical Valuation Engine")
 
 with head_c2:
@@ -136,14 +141,15 @@ with head_c2:
         "Sport",
         options=["NBA (Basketball)", "MLB (Baseball)"],
         index=0,
-        label_visibility="collapsed"
+        label_visibility="collapsed",
+        key="sport_header_select"
     )
     sport = "mlb" if "MLB" in sport_choice else "nba"
     sport_label = "MLB" if sport == "mlb" else "NBA"
 
 with head_c3:
     st.markdown(f"""
-    <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 7px 12px; text-align: center;">
+    <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; text-align: center;">
         <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Balance: </span>
         <span style="font-size: 16px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</span>
     </div>
