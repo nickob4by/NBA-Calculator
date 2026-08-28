@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 from typing import Dict, Optional
 import config
 
@@ -41,7 +41,7 @@ def size_bet(
     bankroll: float,
     kelly_multiplier: float = config.DEFAULT_KELLY_FRACTION,
     max_bankroll_pct: float = config.DEFAULT_MAX_BANKROLL_PCT,
-    min_bet_amount: float = 5.0
+    min_bet_amount: float = config.MIN_BET_AMOUNT
 ) -> Dict:
     """
     Calculates exact dollar stake and bankroll percentage allocation for a given bet.

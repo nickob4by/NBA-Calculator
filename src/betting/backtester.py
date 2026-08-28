@@ -201,7 +201,7 @@ class HistoricalBacktester:
                 )
 
                 stake = round(frac * effective_bankroll, 2)
-                if stake < 5.0:
+                if stake < 1.0:
                     continue
 
                 is_win = bet["actual_win"]

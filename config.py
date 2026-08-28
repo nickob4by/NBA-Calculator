@@ -1,4 +1,4 @@
-﻿import os
+import os
 import sys
 from pathlib import Path
 from dotenv import load_dotenv
@@ -31,11 +31,16 @@ NBA_API_MAX_RETRIES = int(os.getenv("NBA_API_MAX_RETRIES", "4"))
 ROLLING_WINDOWS = [5, 10, 20]
 EWMA_SPANS = [5, 10]
 
+# Currency Settings
+DEFAULT_CURRENCY = "₱"
+DEFAULT_CURRENCY_CODE = "PHP"
+
 # Betting Engine Defaults
 DEFAULT_KELLY_FRACTION = 0.15     # 15% Fractional Kelly
 DEFAULT_MIN_EDGE = 0.025          # 2.5% minimum edge
 DEFAULT_MAX_BANKROLL_PCT = 0.04   # 4.0% max risk per bet
-DEFAULT_STARTING_BANKROLL = 10000.0
+DEFAULT_STARTING_BANKROLL = 1200.0 # ₱1,200 PHP
+MIN_BET_AMOUNT = 10.0             # ₱10.00 min stake
 
 # Supported Sports
 SPORTS = ["nba", "mlb"]

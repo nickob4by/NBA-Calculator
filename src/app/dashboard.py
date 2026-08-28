@@ -62,7 +62,7 @@ sport_label = "MLB (Baseball)" if sport == "mlb" else "NBA (Basketball)"
 
 st.sidebar.markdown("---")
 st.sidebar.subheader("💰 Bankroll & Risk Settings")
-bankroll_val = st.sidebar.number_input("Your Bankroll ($)", min_value=100.0, max_value=1000000.0, value=10000.0, step=500.0)
+bankroll_val = st.sidebar.number_input(f"Your Bankroll ({config.DEFAULT_CURRENCY})", min_value=50.0, max_value=10000000.0, value=float(config.DEFAULT_STARTING_BANKROLL), step=50.0)
 kelly_mult = st.sidebar.slider("Fractional Kelly Multiplier", min_value=0.05, max_value=0.50, value=0.15, step=0.01, help="0.15 = 15% Fractional Kelly")
 min_edge_pct = st.sidebar.slider("Min Edge Threshold (%)", min_value=0.5, max_value=10.0, value=2.5, step=0.5) / 100.0
 
@@ -222,7 +222,7 @@ with tab_predict:
                     "Edge (%)": f"{opp['edge']*100:+.2f}%",
                     "Expected Value": f"{opp['ev']:+.3f}",
                     "Kelly %": f"{sizing['stake_pct']:.2f}%",
-                    "Recommended Stake ($)": f"${sizing['stake']:,.2f}"
+                    f"Recommended Stake ({config.DEFAULT_CURRENCY})": f"{config.DEFAULT_CURRENCY}{sizing['stake']:,.2f}"
                 })
             st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
 
@@ -349,17 +349,17 @@ with tab_backtest:
     r1, r2, r3, r4, r5, r6 = st.columns(6)
     r1.metric("Total Wagers", f"{res.get('total_bets', 0):,}")
     r2.metric("Win Rate", f"{res.get('win_rate', 0.0)}%", f"{res.get('wins', 0)}W - {res.get('losses', 0)}L")
-    r3.metric("Net Profit ($)", f"${res.get('pnl', 0.0):,.2f}")
+    r3.metric(f"Net Profit ({config.DEFAULT_CURRENCY})", f"{config.DEFAULT_CURRENCY}{res.get('pnl', 0.0):,.2f}")
     r4.metric("ROI (%)", f"{res.get('roi_pct', 0.0):+.2f}%")
-    r5.metric("Max Drawdown", f"{res.get('max_drawdown_pct', 0.0):.2f}%", f"${res.get('max_drawdown_dollars', 0.0):,.2f}")
+    r5.metric("Max Drawdown", f"{res.get('max_drawdown_pct', 0.0):.2f}%", f"{config.DEFAULT_CURRENCY}{res.get('max_drawdown_dollars', 0.0):,.2f}")
     r6.metric("Beat Closing Line", f"{res.get('beat_closing_pct', 0.0)}%", f"Avg CLV: {res.get('avg_clv_pct', 0.0):+.2f}%")
 
     if res["equity_curve"]:
         eq_df = pd.DataFrame(res["equity_curve"])
         fig_equity = px.line(
             eq_df, x="game_date", y="bankroll",
-            title=f"{sport.upper()} Portfolio Equity Trajectory ($)",
-            labels={"game_date": "Date", "bankroll": "Bankroll ($)"}
+            title=f"{sport.upper()} Portfolio Equity Trajectory ({config.DEFAULT_CURRENCY})",
+            labels={"game_date": "Date", "bankroll": f"Bankroll ({config.DEFAULT_CURRENCY})"}
         )
         fig_equity.update_traces(line=dict(color="#10b981", width=2.5))
         st.plotly_chart(fig_equity, use_container_width=True)

@@ -128,7 +128,7 @@ def cmd_predict(args):
         for opp in ml_eval["opportunities"]:
             side_team = h_name if opp["side"] == "home" else a_name
             sizing = size_bet(opp["model_prob"], opp["decimal_odds"], args.bankroll, kelly_multiplier=args.kelly)
-            console.print(f"[green]* +EV Opportunity: {side_team} @ {opp['decimal_odds']} | Edge: {opp['edge']*100:+.1f}% | EV: {opp['ev']:+.3f} | Stake: ${sizing['stake']} ({sizing['stake_pct']}%) [/green]")
+            console.print(f"[green]* +EV Opportunity: {side_team} @ {opp['decimal_odds']} | Edge: {opp['edge']*100:+.1f}% | EV: {opp['ev']:+.3f} | Stake: {config.DEFAULT_CURRENCY}{sizing['stake']} ({sizing['stake_pct']}%) [/green]")
         if not ml_eval["opportunities"]:
             console.print("[yellow]No edge exceeding minimum threshold found for this game.[/yellow]")
 
@@ -152,11 +152,11 @@ def cmd_backtest(args):
     table.add_row("Total Bets", str(res["total_bets"]))
     table.add_row("Record (W - L - P)", f"{res['wins']} - {res['losses']} - {res['pushes']}")
     table.add_row("Win Rate", f"{res['win_rate']}%")
-    table.add_row("Total Staked", f"${res['total_staked']:,.2f}")
-    table.add_row("Net Profit (PnL)", f"${res['pnl']:,.2f}")
+    table.add_row(f"Total Staked ({config.DEFAULT_CURRENCY})", f"{config.DEFAULT_CURRENCY}{res['total_staked']:,.2f}")
+    table.add_row(f"Net Profit (PnL)", f"{config.DEFAULT_CURRENCY}{res['pnl']:,.2f}")
     table.add_row("Return on Investment (ROI)", f"{res['roi_pct']:+.2f}%")
-    table.add_row("Final Bankroll", f"${res['final_bankroll']:,.2f}")
-    table.add_row("Max Drawdown", f"{res['max_drawdown_pct']:.2f}% (${res['max_drawdown_dollars']:,.2f})")
+    table.add_row(f"Final Bankroll", f"{config.DEFAULT_CURRENCY}{res['final_bankroll']:,.2f}")
+    table.add_row("Max Drawdown", f"{res['max_drawdown_pct']:.2f}% ({config.DEFAULT_CURRENCY}{res['max_drawdown_dollars']:,.2f})")
     table.add_row("Sharpe Ratio", str(res["sharpe_ratio"]))
     table.add_row("Avg Closing Line Value (CLV)", f"{res['avg_clv_pct']:+.2f}%")
     table.add_row("Beat Closing Line Rate", f"{res['beat_closing_pct']}%")
@@ -200,14 +200,14 @@ def main():
     p_pred.add_argument("--away", type=str, required=True, help="Away team (e.g. LAL or LAD)")
     p_pred.add_argument("--home-ml", type=float, default=None, help="Home decimal odds")
     p_pred.add_argument("--away-ml", type=float, default=None, help="Away decimal odds")
-    p_pred.add_argument("--bankroll", type=float, default=10000.0, help="Current bankroll")
+    p_pred.add_argument("--bankroll", type=float, default=config.DEFAULT_STARTING_BANKROLL, help="Current bankroll in PHP")
     p_pred.add_argument("--kelly", type=float, default=config.DEFAULT_KELLY_FRACTION, help="Kelly fraction")
     p_pred.add_argument("--min-edge", type=float, default=config.DEFAULT_MIN_EDGE, help="Minimum EV edge")
 
     # backtest
     p_bt = subparsers.add_parser("backtest", help="Run historical backtesting")
     p_bt.add_argument("--season", type=str, default=None, help="Season filter")
-    p_bt.add_argument("--bankroll", type=float, default=10000.0, help="Starting bankroll")
+    p_bt.add_argument("--bankroll", type=float, default=config.DEFAULT_STARTING_BANKROLL, help="Starting bankroll in PHP")
     p_bt.add_argument("--kelly", type=float, default=config.DEFAULT_KELLY_FRACTION, help="Kelly multiplier")
     p_bt.add_argument("--min-edge", type=float, default=config.DEFAULT_MIN_EDGE, help="Min edge")
     p_bt.add_argument("--compound", action="store_true", help="Dynamic compounding bankroll")
