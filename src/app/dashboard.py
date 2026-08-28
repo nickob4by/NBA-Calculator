@@ -275,6 +275,13 @@ if nav_selection == "Matchup Forecast":
             key=f"mf_away_team_{sport}"
         )
 
+    # Swap Home / Away button
+    if home_team_id is not None and away_team_id is not None:
+        if st.button("🔄 Swap Home / Away Teams", key=f"btn_swap_{sport}"):
+            st.session_state[f"mf_home_team_{sport}"] = away_team_id
+            st.session_state[f"mf_away_team_{sport}"] = home_team_id
+            st.rerun()
+
     home_sp_fip = None
     away_sp_fip = None
     if sport == "mlb" and home_team_id is not None and away_team_id is not None:
@@ -286,7 +293,7 @@ if nav_selection == "Matchup Forecast":
 
         with sp_c1:
             h_sp_idx = st.selectbox(
-                f"{config.get_team_abbrev(home_team_id, sport='mlb')} Starting Pitcher",
+                f"{config.get_team_abbrev(home_team_id, sport='mlb')} Starting Pitcher (Home)",
                 options=range(len(h_starters)),
                 format_func=lambda i: f"{h_starters[i]['name']} ({h_starters[i]['fip']:.2f} FIP | {h_starters[i]['whip']:.2f} WHIP)",
                 key=f"h_sp_{home_team_id}"
@@ -295,7 +302,7 @@ if nav_selection == "Matchup Forecast":
 
         with sp_c2:
             a_sp_idx = st.selectbox(
-                f"{config.get_team_abbrev(away_team_id, sport='mlb')} Starting Pitcher",
+                f"{config.get_team_abbrev(away_team_id, sport='mlb')} Starting Pitcher (Away)",
                 options=range(len(a_starters)),
                 format_func=lambda i: f"{a_starters[i]['name']} ({a_starters[i]['fip']:.2f} FIP | {a_starters[i]['whip']:.2f} WHIP)",
                 key=f"a_sp_{away_team_id}"
@@ -329,6 +336,7 @@ if nav_selection == "Matchup Forecast":
         a_name = config.get_team_name(away_team_id, sport=sport)
 
         st.markdown("---")
+        st.caption(f"📍 **Venue & Location Impact**: {h_name} has Home Advantage. {a_name} has road travel fatigue ({eval_row['away_travel_distance'].iloc[0]:,.0f} miles).")
         w_col1, w_col2 = st.columns(2)
         with w_col1:
             h_is_fav = pred_p_home >= 0.50
