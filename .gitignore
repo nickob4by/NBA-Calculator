@@ -1,4 +1,4 @@
-﻿.venv/
+.venv/
 __pycache__/
 *.pyc
 *.pyo
@@ -6,7 +6,9 @@ __pycache__/
 .pytest_cache/
 .coverage
 htmlcov/
-data/
+data/*
+!data/sync/
+!data/sync/**
 *.sqlite
 *.db
 .env

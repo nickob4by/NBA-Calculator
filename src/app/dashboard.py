@@ -26,6 +26,7 @@ from src.betting.ev_engine import evaluate_moneyline_market
 from src.betting.kelly import size_bet
 from src.betting.backtester import HistoricalBacktester
 from src.betting.ledger import BankrollLedger
+from src.db.github_sync import GitHubDataSync
 
 st.set_page_config(
     page_title="Quantitative Sportsbook Analytics",
@@ -33,6 +34,10 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="collapsed"
 )
+
+# Auto-restore sync snapshot if freshly cloned / empty
+if db.fetch_one("SELECT COUNT(*) as c FROM bankroll_transactions")["c"] == 0:
+    GitHubDataSync.import_data_snapshot_if_exists()
 
 # Persistent state initialization from database
 db_kelly = float(db.get_setting("kelly_mult", str(config.DEFAULT_KELLY_FRACTION)))
@@ -813,3 +818,45 @@ elif nav_selection == "Data & Settings":
                 status.update(label="All team & player statistics successfully updated!", state="complete", expanded=False)
             st.success("Database and player stats are now completely up-to-date.")
             st.rerun()
+
+    st.markdown("---")
+    st.markdown("##### GitHub Cloud Data Persistence & Multi-PC Sync")
+    st.caption("Sync your starting balance, ledger history, open bets, and settings with GitHub so your data is persistent when cloning to other PCs.")
+
+    sync_c1, sync_c2 = st.columns(2)
+    with sync_c1:
+        st.markdown("""
+        <div class="card-neutral" style="padding: 16px; margin-bottom: 12px;">
+            <div style="font-weight: 700; color: #38bdf8; font-size: 14px; margin-bottom: 6px;">Backup Data to GitHub</div>
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
+                Exports your bankroll, ledger, wagers, and user settings, then automatically commits and pushes them to your GitHub repository.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Backup & Push Data to GitHub", type="primary", key="btn_push_github"):
+            with st.spinner("Pushing data snapshot to GitHub..."):
+                ok, msg = GitHubDataSync.push_to_github()
+                if ok:
+                    st.session_state["bet_notification"] = f"Cloud Sync: {msg}"
+                    st.rerun()
+                else:
+                    st.error(msg)
+
+    with sync_c2:
+        st.markdown("""
+        <div class="card-neutral" style="padding: 16px; margin-bottom: 12px;">
+            <div style="font-weight: 700; color: #34d399; font-size: 14px; margin-bottom: 6px;">Pull & Sync Data from GitHub</div>
+            <div style="font-size: 12px; color: #94a3b8; margin-bottom: 12px;">
+                Pulls the latest snapshot from GitHub and restores your bankroll, bets, and settings into this computer's database.
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+        if st.button("Pull & Sync Data from GitHub", key="btn_pull_github"):
+            with st.spinner("Pulling data snapshot from GitHub..."):
+                ok, msg = GitHubDataSync.pull_from_github()
+                if ok:
+                    st.cache_resource.clear()
+                    st.session_state["bet_notification"] = f"Cloud Sync: {msg}"
+                    st.rerun()
+                else:
+                    st.error(msg)
