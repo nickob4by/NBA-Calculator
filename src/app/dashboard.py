@@ -275,12 +275,17 @@ if nav_selection == "Matchup Forecast":
             key=f"mf_away_team_{sport}"
         )
 
+    def swap_matchup_teams(target_sport: str):
+        h_key = f"mf_home_team_{target_sport}"
+        a_key = f"mf_away_team_{target_sport}"
+        h_val = st.session_state.get(h_key)
+        a_val = st.session_state.get(a_key)
+        st.session_state[h_key] = a_val
+        st.session_state[a_key] = h_val
+
     # Swap Home / Away button
     if home_team_id is not None and away_team_id is not None:
-        if st.button("🔄 Swap Home / Away Teams", key=f"btn_swap_{sport}"):
-            st.session_state[f"mf_home_team_{sport}"] = away_team_id
-            st.session_state[f"mf_away_team_{sport}"] = home_team_id
-            st.rerun()
+        st.button("🔄 Swap Home / Away Teams", key=f"btn_swap_{sport}", on_click=swap_matchup_teams, args=(sport,))
 
     home_sp_fip = None
     away_sp_fip = None
