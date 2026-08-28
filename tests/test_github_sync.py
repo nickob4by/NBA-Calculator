@@ -1,9 +1,9 @@
 import pytest
-from src.db.database import db
+import src.db.database as db_mod
 from src.db.github_sync import GitHubDataSync
 
 def test_github_sync_export_and_import():
-    db.set_setting('sync_test_key', 'test_value')
+    db_mod.db.set_setting('sync_test_key', 'test_value')
     counts = GitHubDataSync.export_data_snapshot()
     assert 'settings' in counts
     assert 'transactions' in counts
@@ -16,4 +16,4 @@ def test_github_sync_export_and_import():
 
     restored = GitHubDataSync.import_data_snapshot_if_exists()
     assert restored is True
-    assert db.get_setting('sync_test_key') == 'test_value'
+    assert db_mod.db.get_setting('sync_test_key') == 'test_value'

@@ -44,7 +44,7 @@ DEFAULT_STARTING_BANKROLL = 1200.0 # ₱1,200 PHP
 MIN_BET_AMOUNT = 1.0              # ₱1.00 min micro-stake
 
 # Supported Sports
-SPORTS = ["nba", "mlb"]
+SPORTS = ["nba", "mlb", "dota2"]
 
 # ================= 30 NBA TEAMS =================
 NBA_TEAMS = {
@@ -114,8 +114,47 @@ MLB_TEAMS = {
     158: {"abbrev": "MIL", "name": "Milwaukee Brewers", "city": "Milwaukee", "league": "NL", "div": "Central", "lat": 43.0280, "lon": -87.9712, "stadium": "American Family Field", "park_factor": 1.03}
 }
 
+# ================= 30 PRO DOTA 2 TEAMS (EPL Masters II & Tier 1/2) =================
+DOTA2_TEAMS = {
+    1001: {"abbrev": "NAVI", "name": "Natus Vincere", "region": "WEU/EEU", "elo": 1560},
+    1002: {"abbrev": "NAV.J", "name": "NAVI Junior", "region": "EEU", "elo": 1510},
+    1003: {"abbrev": "MOUZ", "name": "MOUZ", "region": "WEU", "elo": 1540},
+    1004: {"abbrev": "1W", "name": "1win (1W Team)", "region": "EEU", "elo": 1580},
+    1005: {"abbrev": "ALL", "name": "Alliance", "region": "WEU", "elo": 1490},
+    1006: {"abbrev": "SEC", "name": "Team Secret", "region": "WEU", "elo": 1550},
+    1007: {"abbrev": "OG", "name": "OG", "region": "WEU", "elo": 1620},
+    1008: {"abbrev": "TUN", "name": "Tundra Esports", "region": "WEU", "elo": 1720},
+    1009: {"abbrev": "FLC", "name": "Team Falcons", "region": "MENA", "elo": 1810},
+    1010: {"abbrev": "GG", "name": "Gaimin Gladiators", "region": "WEU", "elo": 1790},
+    1011: {"abbrev": "TS", "name": "Team Spirit", "region": "EEU", "elo": 1780},
+    1012: {"abbrev": "TL", "name": "Team Liquid", "region": "WEU", "elo": 1800},
+    1013: {"abbrev": "BB", "name": "BetBoom Team", "region": "EEU", "elo": 1740},
+    1014: {"abbrev": "VP", "name": "Virtus.pro", "region": "EEU", "elo": 1590},
+    1015: {"abbrev": "AUR", "name": "Aurora", "region": "SEA", "elo": 1610},
+    1016: {"abbrev": "TAL", "name": "Talon Esports", "region": "SEA", "elo": 1580},
+    1017: {"abbrev": "XG", "name": "Xtreme Gaming", "region": "CN", "elo": 1750},
+    1018: {"abbrev": "NP", "name": "Night Pulse", "region": "EEU", "elo": 1480},
+    1019: {"abbrev": "YS", "name": "Yellow Submarine", "region": "EEU", "elo": 1530},
+    1020: {"abbrev": "NEM", "name": "Nemiga Gaming", "region": "EEU", "elo": 1470},
+    1021: {"abbrev": "RF", "name": "Rest Farmers", "region": "WEU", "elo": 1460},
+    1022: {"abbrev": "LVL", "name": "Level UP", "region": "WEU", "elo": 1450},
+    1023: {"abbrev": "ASA", "name": "ASAKURA", "region": "EEU", "elo": 1460},
+    1024: {"abbrev": "PST", "name": "PSG Quest", "region": "MENA", "elo": 1640},
+    1025: {"abbrev": "C9", "name": "Cloud9 (Entity)", "region": "WEU", "elo": 1690},
+    1026: {"abbrev": "HER", "name": "Heroic", "region": "SA", "elo": 1590},
+    1027: {"abbrev": "BOM", "name": "BOOM Esports", "region": "SEA", "elo": 1560},
+    1028: {"abbrev": "BLD", "name": "Bleed Esports", "region": "SEA", "elo": 1530},
+    1029: {"abbrev": "LGD", "name": "LGD Gaming", "region": "CN", "elo": 1600},
+    1030: {"abbrev": "MNT", "name": "Monte", "region": "EEU", "elo": 1450}
+}
+
 def get_teams_for_sport(sport: str = "nba"):
-    return MLB_TEAMS if sport.lower() == "mlb" else NBA_TEAMS
+    s = sport.lower()
+    if s == "mlb":
+        return MLB_TEAMS
+    elif s == "dota2":
+        return DOTA2_TEAMS
+    return NBA_TEAMS
 
 def get_team_id(identifier, sport: str = "nba"):
     teams_dict = get_teams_for_sport(sport)
@@ -128,7 +167,7 @@ def get_team_id(identifier, sport: str = "nba"):
                 return k
         ident_lower = identifier.strip().lower()
         for k, v in teams_dict.items():
-            if v["name"].lower() == ident_lower or v["city"].lower() == ident_lower:
+            if v["name"].lower() == ident_lower:
                 return k
     return None
 
