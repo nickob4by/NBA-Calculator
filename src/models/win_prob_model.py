@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 import pandas as pd
 from scipy.stats import norm
 from sklearn.linear_model import LogisticRegression
@@ -61,24 +61,25 @@ class WinProbabilityModel:
         self.calibrator.fit(raw_probs, y_true_wins)
         return self
 
-    def predict_proba(self, predicted_margins: np.ndarray = None, X: pd.DataFrame = None, sigma: float = 13.5) -> np.ndarray:
+    def predict_proba(self, X: Optional[pd.DataFrame] = None, predicted_margins: Optional[np.ndarray] = None, sigma: float = 13.5) -> np.ndarray:
         """
         Returns calibrated Home Win Probabilities.
         """
-        if self.mode in ["cdf", "cdf_calibrated"]:
-            if predicted_margins is None:
-                raise ValueError("predicted_margins required for cdf mode")
+        if self.mode in ["cdf", "cdf_calibrated"] and predicted_margins is not None:
+            if sigma <= 1.0:
+                sigma = 13.5
             raw_probs = self.margin_to_probability_cdf(predicted_margins, sigma)
             if self.mode == "cdf_calibrated" and self.calibrator.is_fitted:
-                return self.calibrator.transform(raw_probs)
-            return raw_probs
-        elif self.mode == "classifier":
-            if X is None:
-                raise ValueError("Feature matrix X required for classifier mode")
+                calibrated = self.calibrator.transform(raw_probs)
+                final_probs = 0.5 * raw_probs + 0.5 * calibrated
+                return np.clip(final_probs, 0.15, 0.85)
+            return np.clip(raw_probs, 0.15, 0.85)
+        
+        elif self.classifier is not None and X is not None:
             raw_probs = self.classifier.predict_proba(X[self.feature_names])[:, 1]
             return self.calibrator.transform(raw_probs)
         else:
-            raise ValueError(f"Unknown mode {self.mode}")
+            raise ValueError(f"Unknown mode {self.mode} or missing required inputs")
 
     def evaluate(self, y_true_wins: np.ndarray, win_probs: np.ndarray) -> Dict:
         return compute_calibration_metrics(y_true_wins, win_probs)

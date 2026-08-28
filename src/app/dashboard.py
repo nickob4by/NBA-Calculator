@@ -89,9 +89,9 @@ def load_sport_models_and_data(target_sport: str):
         with open(metrics_path, "r", encoding="utf-8") as f:
             metrics = json.load(f)
             
-    return margin_model, totals_model, win_model, matchups_df, metrics
+    return margin_model, totals_model, win_model, matchups_df, logs_df, metrics
 
-margin_model, totals_model, win_model, matchups_df, model_metrics = load_sport_models_and_data(sport)
+margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = load_sport_models_and_data(sport)
 
 # Navigation Tabs
 score_unit = "Runs" if sport == "mlb" else "Points"
@@ -126,10 +126,9 @@ with tab_predict:
     if home_team_id == away_team_id:
         st.warning("Please select two distinct teams for the matchup.")
     else:
-        recent_home = matchups_df[matchups_df["home_team_id"] == home_team_id].iloc[-1:]
-        eval_row = recent_home.copy() if not recent_home.empty else matchups_df.iloc[-1:].copy()
-        
-        feature_cols = get_feature_columns(eval_row)
+        from src.features.matchup_builder import build_upcoming_matchup
+        eval_row = build_upcoming_matchup(home_team_id, away_team_id, logs_df, sport=sport)
+        feature_cols = margin_model.feature_names
         X = eval_row[feature_cols]
 
         pred_margin = float(margin_model.predict(X)[0])

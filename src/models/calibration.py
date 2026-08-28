@@ -1,4 +1,4 @@
-﻿import numpy as np
+import numpy as np
 import pandas as pd
 from sklearn.isotonic import IsotonicRegression
 from sklearn.linear_model import LogisticRegression
@@ -23,10 +23,9 @@ class ProbabilityCalibrator:
         if self.method == "isotonic":
             self.calibrator = IsotonicRegression(out_of_bounds="clip", y_min=0.001, y_max=0.999)
             self.calibrator.fit(y_prob_raw.ravel(), y_true)
-        else: # Platt Scaling via Logistic Regression
-            # Log-odds (logit) transformation for Platt scaling
+        else: # Platt Scaling via Logistic Regression with strong L2 regularization
             logits = np.log(y_prob_raw / (1.0 - y_prob_raw))
-            self.calibrator = LogisticRegression(solver="lbfgs", C=1.0)
+            self.calibrator = LogisticRegression(solver="lbfgs", C=0.1, max_iter=100)
             self.calibrator.fit(logits, y_true)
 
         self.is_fitted = True

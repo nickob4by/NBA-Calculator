@@ -96,10 +96,9 @@ def cmd_predict(args):
     logs_df = db.fetch_df("SELECT * FROM team_game_logs WHERE sport=? ORDER BY game_date, game_id", (sport,))
     matchups_df = build_full_feature_dataset(logs_df, sport=sport)
 
-    recent_home = matchups_df[matchups_df["home_team_id"] == home_id].iloc[-1:]
-    eval_row = recent_home.copy() if not recent_home.empty else matchups_df.iloc[-1:].copy()
-
-    feature_cols = get_feature_columns(eval_row)
+    from src.features.matchup_builder import build_upcoming_matchup
+    eval_row = build_upcoming_matchup(home_id, away_id, logs_df, sport=sport)
+    feature_cols = margin_model.feature_names
     X = eval_row[feature_cols]
 
     pred_margin = float(margin_model.predict(X)[0])

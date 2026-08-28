@@ -160,10 +160,14 @@ class MLBWinProbabilityModel:
 
     def predict_proba(self, predicted_margins: np.ndarray, sigma: float = 3.2) -> np.ndarray:
         margins = np.asarray(predicted_margins)
+        if sigma <= 0.5:
+            sigma = 3.2
         raw_probs = norm.cdf(margins / sigma)
         if self.calibrator.is_fitted:
-            return self.calibrator.transform(raw_probs)
-        return raw_probs
+            calibrated = self.calibrator.transform(raw_probs)
+            final_probs = 0.5 * raw_probs + 0.5 * calibrated
+            return np.clip(final_probs, 0.20, 0.80)
+        return np.clip(raw_probs, 0.20, 0.80)
 
     def predict_run_line_proba(self, predicted_margins: np.ndarray, run_line: float = -1.5, sigma: float = 3.2) -> np.ndarray:
         """
