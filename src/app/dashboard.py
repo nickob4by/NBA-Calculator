@@ -202,6 +202,20 @@ def load_sport_models_and_data(target_sport: str):
             
     return margin_model, totals_model, win_model, matchups_df, rolled_logs, metrics
 
+@st.cache_resource(show_spinner=False)
+def preload_all_sports_data():
+    """
+    Pre-loads and caches models and rolling features for all sports (NBA & MLB)
+    so all page interactions, sport toggles, and team selections execute instantly.
+    """
+    return {
+        "nba": load_sport_models_and_data("nba"),
+        "mlb": load_sport_models_and_data("mlb")
+    }
+
+# Automatically initialize all sports data on startup
+sports_cache = preload_all_sports_data()
+
 # ================= 1. MATCHUP FORECAST =================
 if nav_selection == "Matchup Forecast":
     st.markdown("<h2 style='color:#f8fafc; font-weight:700; margin-bottom: 4px;'>Matchup Forecast & Valuation</h2>", unsafe_allow_html=True)
@@ -226,7 +240,7 @@ if nav_selection == "Matchup Forecast":
         sport = "mlb" if "MLB" in sport_choice else "nba"
         sport_label = "MLB" if sport == "mlb" else "NBA"
 
-    margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = load_sport_models_and_data(sport)
+    margin_model, totals_model, win_model, matchups_df, logs_df, model_metrics = sports_cache[sport]
     teams_dict = config.MLB_TEAMS if sport == "mlb" else config.NBA_TEAMS
     team_list = list(teams_dict.keys())
     team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in teams_dict.items()}
@@ -548,7 +562,7 @@ elif nav_selection == "Team Explorer":
         exp_sport = "mlb" if "MLB" in exp_sport_choice else "nba"
         exp_sport_label = "MLB" if exp_sport == "mlb" else "NBA"
 
-    exp_margin, exp_totals, exp_win, exp_matchups, exp_logs, _ = load_sport_models_and_data(exp_sport)
+    exp_margin, exp_totals, exp_win, exp_matchups, exp_logs, _ = sports_cache[exp_sport]
     exp_teams = config.MLB_TEAMS if exp_sport == "mlb" else config.NBA_TEAMS
     exp_team_list = list(exp_teams.keys())
     exp_team_opts = {k: f"{v['name']} ({v['abbrev']})" for k, v in exp_teams.items()}
