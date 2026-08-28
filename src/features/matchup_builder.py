@@ -1,5 +1,6 @@
-﻿import pandas as pd
+import pandas as pd
 import numpy as np
+from typing import Optional, Dict, List
 from src.features.four_factors import compute_advanced_stats_dataframe
 from src.features.mlb_sabermetrics import compute_mlb_sabermetrics_dataframe
 from src.features.situational import compute_situational_features, haversine_distance, get_arena_coordinates
@@ -112,13 +113,20 @@ def build_full_feature_dataset(game_logs_df: pd.DataFrame, games_df: pd.DataFram
     matchups = matchups.sort_values(by=["game_date", "game_id"]).reset_index(drop=True)
     return matchups
 
-def build_upcoming_matchup(home_team_id: int, away_team_id: int, logs_df: pd.DataFrame, sport: str = "nba") -> pd.DataFrame:
+def build_upcoming_matchup(
+    home_team_id: int,
+    away_team_id: int,
+    logs_df: pd.DataFrame,
+    sport: str = "nba",
+    home_sp_fip: Optional[float] = None,
+    away_sp_fip: Optional[float] = None
+) -> pd.DataFrame:
     """
     Constructs a true synthesized forward-looking feature vector comparing
-    home_team's latest lagged form against away_team's latest lagged form directly from logs.
+    home_team's latest lagged form against away_team's latest lagged form directly from logs,
+    incorporating individual Starting Pitcher metrics if in MLB mode.
     """
     if "roll_pts_w5" not in logs_df.columns and "roll_runs_w5" not in logs_df.columns:
-        # Precompute rolled stats if raw logs passed
         if sport == "mlb":
             adv_df = compute_mlb_sabermetrics_dataframe(logs_df)
             adv_cols = [c for c in adv_df.columns if c not in logs_df.columns or c in ["game_id", "team_id", "opponent_id", "sport"]]
@@ -192,6 +200,15 @@ def build_upcoming_matchup(home_team_id: int, away_team_id: int, logs_df: pd.Dat
     if f"home_roll_pace_w10" in matchup_dict and f"away_roll_pace_w10" in matchup_dict:
         matchup_dict["expected_pace_w10"] = 0.5 * (matchup_dict["home_roll_pace_w10"] + matchup_dict["away_roll_pace_w10"])
 
+    # MLB Starting Pitcher Features
+    if sport == "mlb":
+        h_sp = float(home_sp_fip if home_sp_fip is not None else h_last.get("roll_fip_proxy_w10", 4.0))
+        a_sp = float(away_sp_fip if away_sp_fip is not None else a_last.get("roll_fip_proxy_w10", 4.0))
+        matchup_dict["home_sp_fip"] = h_sp
+        matchup_dict["away_sp_fip"] = a_sp
+        # Positive diff_sp_fip indicates Home pitcher is superior (Away FIP > Home FIP)
+        matchup_dict["diff_sp_fip"] = round(a_sp - h_sp, 3)
+
     return pd.DataFrame([matchup_dict])
 
 def get_feature_columns(matchup_df: pd.DataFrame) -> list:
@@ -205,11 +222,11 @@ def get_feature_columns(matchup_df: pd.DataFrame) -> list:
         "home_season_avg_", "away_season_avg_", "diff_season_avg_",
         "diff_rest_days", "diff_travel_distance", "is_b2b_diff",
         "home_rest_days", "away_rest_days", "home_travel_distance", "away_travel_distance",
-        "home_is_b2b", "away_is_b2b", "expected_pace_w10"
+        "home_is_b2b", "away_is_b2b", "expected_pace_w10",
+        "diff_sp_fip", "home_sp_fip", "away_sp_fip"
     )
 
     numeric_cols = matchup_df.select_dtypes(include=[np.number]).columns.tolist()
     features = [c for c in numeric_cols if c.startswith(valid_prefixes)]
-    # Filter out columns that have no observed non-NaN values in this sport
     features = [c for c in features if not matchup_df[c].isna().all()]
     return sorted(features)

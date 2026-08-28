@@ -126,8 +126,38 @@ with tab_predict:
     if home_team_id == away_team_id:
         st.warning("Please select two distinct teams for the matchup.")
     else:
+        home_sp_fip = None
+        away_sp_fip = None
+        if sport == "mlb":
+            from src.features.mlb_pitcher_metrics import get_team_starters
+            st.markdown("#### ⚾ Starting Pitcher Duel")
+            sp_col1, sp_col2 = st.columns(2)
+            
+            h_starters = get_team_starters(home_team_id)
+            a_starters = get_team_starters(away_team_id)
+            
+            with sp_col1:
+                h_sp_idx = st.selectbox(
+                    f"🏠 {config.get_team_abbrev(home_team_id, sport='mlb')} Starting Pitcher",
+                    options=range(len(h_starters)),
+                    format_func=lambda i: f"{h_starters[i]['name']} ({h_starters[i]['fip']:.2f} FIP | {h_starters[i]['whip']:.2f} WHIP | {h_starters[i]['k9']:.1f} K/9)",
+                    key="home_sp_select"
+                )
+                h_selected_sp = h_starters[h_sp_idx]
+                home_sp_fip = h_selected_sp["fip"]
+
+            with sp_col2:
+                a_sp_idx = st.selectbox(
+                    f"✈️ {config.get_team_abbrev(away_team_id, sport='mlb')} Starting Pitcher",
+                    options=range(len(a_starters)),
+                    format_func=lambda i: f"{a_starters[i]['name']} ({a_starters[i]['fip']:.2f} FIP | {a_starters[i]['whip']:.2f} WHIP | {a_starters[i]['k9']:.1f} K/9)",
+                    key="away_sp_select"
+                )
+                a_selected_sp = a_starters[a_sp_idx]
+                away_sp_fip = a_selected_sp["fip"]
+
         from src.features.matchup_builder import build_upcoming_matchup
-        eval_row = build_upcoming_matchup(home_team_id, away_team_id, logs_df, sport=sport)
+        eval_row = build_upcoming_matchup(home_team_id, away_team_id, logs_df, sport=sport, home_sp_fip=home_sp_fip, away_sp_fip=away_sp_fip)
         feature_cols = margin_model.feature_names
         X = eval_row[feature_cols]
 
@@ -199,12 +229,24 @@ with tab_predict:
 # ================= TAB 2: ANALYTICS (FOUR FACTORS OR SABERMETRICS) =================
 with tab_analytics:
     if sport == "mlb":
-        st.subheader("⚾ Baseball Sabermetrics & Pythagorean Expectation")
+        st.subheader("⚾ Baseball Sabermetrics & Starting Rotation Explorer")
         col1, col2 = st.columns(2)
         with col1:
             t1_sel = st.selectbox("Team 1", options=team_list, format_func=lambda x: team_options[x], index=default_home_idx, key="mlb_t1")
         with col2:
             t2_sel = st.selectbox("Team 2", options=team_list, format_func=lambda x: team_options[x], index=default_away_idx, key="mlb_t2")
+
+        from src.features.mlb_pitcher_metrics import get_team_starters
+        t1_rot = get_team_starters(t1_sel)
+        t2_rot = get_team_starters(t2_sel)
+
+        p_col1, p_col2 = st.columns(2)
+        with p_col1:
+            st.markdown(f"**{config.get_team_name(t1_sel, sport='mlb')} Starting Rotation**")
+            st.dataframe(pd.DataFrame(t1_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
+        with p_col2:
+            st.markdown(f"**{config.get_team_name(t2_sel, sport='mlb')} Starting Rotation**")
+            st.dataframe(pd.DataFrame(t2_rot)[["name", "fip", "whip", "k9", "throws"]].rename(columns={"name": "Pitcher", "fip": "FIP", "whip": "WHIP", "k9": "K/9", "throws": "Hand"}), use_container_width=True)
 
         t1_logs = matchups_df[matchups_df["home_team_id"] == t1_sel].iloc[-1:]
         t2_logs = matchups_df[matchups_df["home_team_id"] == t2_sel].iloc[-1:]

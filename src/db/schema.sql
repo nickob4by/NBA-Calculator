@@ -22,6 +22,58 @@ CREATE INDEX IF NOT EXISTS idx_games_season ON games (sport, season);
 CREATE INDEX IF NOT EXISTS idx_games_home ON games (home_team_id);
 CREATE INDEX IF NOT EXISTS idx_games_away ON games (away_team_id);
 
+CREATE TABLE IF NOT EXISTS players (
+    player_id INTEGER PRIMARY KEY,
+    sport TEXT NOT NULL DEFAULT 'mlb',
+    team_id INTEGER NOT NULL,
+    player_name TEXT NOT NULL,
+    primary_position TEXT,
+    is_pitcher INTEGER DEFAULT 0,
+    throws TEXT DEFAULT 'R',
+    bats TEXT DEFAULT 'R',
+    baseline_fip REAL DEFAULT 4.20,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_players_sport_team ON players (sport, team_id);
+
+CREATE TABLE IF NOT EXISTS player_game_logs (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    game_id TEXT NOT NULL,
+    player_id INTEGER NOT NULL,
+    sport TEXT NOT NULL DEFAULT 'mlb',
+    team_id INTEGER NOT NULL,
+    opponent_id INTEGER NOT NULL,
+    game_date TEXT NOT NULL,
+    season TEXT NOT NULL,
+    is_home INTEGER NOT NULL,
+    is_starter INTEGER DEFAULT 0,
+    position_type TEXT DEFAULT 'P', -- 'P' for Pitcher, 'B' for Batter
+    -- Pitcher stats
+    ip REAL DEFAULT 0.0,
+    er INTEGER DEFAULT 0,
+    h_allowed INTEGER DEFAULT 0,
+    bb_allowed INTEGER DEFAULT 0,
+    so_thrown INTEGER DEFAULT 0,
+    hr_allowed INTEGER DEFAULT 0,
+    pitches INTEGER DEFAULT 0,
+    game_fip REAL,
+    game_whip REAL,
+    -- Batter stats
+    ab INTEGER DEFAULT 0,
+    runs INTEGER DEFAULT 0,
+    hits INTEGER DEFAULT 0,
+    hr INTEGER DEFAULT 0,
+    rbi INTEGER DEFAULT 0,
+    bb INTEGER DEFAULT 0,
+    so INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_pgl_player_date ON player_game_logs (player_id, game_date);
+CREATE INDEX IF NOT EXISTS idx_pgl_team_date ON player_game_logs (team_id, game_date);
+
 CREATE TABLE IF NOT EXISTS team_game_logs (
     game_id TEXT NOT NULL,
     sport TEXT NOT NULL DEFAULT 'nba',
@@ -62,6 +114,9 @@ CREATE TABLE IF NOT EXISTS team_game_logs (
     lob INTEGER,
     ip REAL,
     er INTEGER,
+    -- Pitcher IDs for match
+    starting_pitcher_id INTEGER,
+    starting_pitcher_fip REAL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (game_id, team_id),
     FOREIGN KEY (game_id) REFERENCES games(game_id) ON DELETE CASCADE
@@ -114,10 +169,10 @@ CREATE TABLE IF NOT EXISTS odds (
     away_ml_open REAL,
     home_ml_close REAL,
     away_ml_close REAL,
-    spread_line REAL, -- For MLB: Run Line (e.g. -1.5)
+    spread_line REAL,
     home_spread_odds REAL DEFAULT -110,
     away_spread_odds REAL DEFAULT -110,
-    total_line REAL, -- Over/Under points or runs
+    total_line REAL,
     over_odds REAL DEFAULT -110,
     under_odds REAL DEFAULT -110,
     recorded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -144,8 +199,8 @@ CREATE TABLE IF NOT EXISTS bets (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     game_id TEXT NOT NULL,
     sport TEXT NOT NULL DEFAULT 'nba',
-    market_type TEXT NOT NULL, -- 'moneyline', 'spread'/'run_line', 'total'
-    side TEXT NOT NULL, -- 'home', 'away', 'over', 'under'
+    market_type TEXT NOT NULL,
+    side TEXT NOT NULL,
     odds REAL NOT NULL,
     american_odds INTEGER,
     stake REAL NOT NULL,

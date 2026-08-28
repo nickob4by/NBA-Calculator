@@ -35,7 +35,7 @@ class Database:
             conn.executescript(schema_sql)
 
     def _migrate(self, conn):
-        """Ensures any new multi-sport columns are added if tables already existed."""
+        """Ensures any new multi-sport and player columns are added if tables already existed."""
         tables_to_migrate = [
             ("games", "sport", "TEXT DEFAULT 'nba'"),
             ("team_game_logs", "sport", "TEXT DEFAULT 'nba'"),
@@ -49,6 +49,8 @@ class Database:
             ("team_game_logs", "lob", "INTEGER"),
             ("team_game_logs", "ip", "REAL"),
             ("team_game_logs", "er", "INTEGER"),
+            ("team_game_logs", "starting_pitcher_id", "INTEGER"),
+            ("team_game_logs", "starting_pitcher_fip", "REAL"),
             ("team_advanced_stats", "sport", "TEXT DEFAULT 'nba'"),
             ("team_advanced_stats", "pythag_win_pct", "REAL"),
             ("team_advanced_stats", "obp", "REAL"),
