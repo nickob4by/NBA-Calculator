@@ -31,21 +31,73 @@ st.set_page_config(
     page_title="Quantitative Sportsbook Analytics",
     page_icon="■",
     layout="wide",
-    initial_sidebar_state="expanded"
+    initial_sidebar_state="auto"
 )
 
-# Minimalist Quantitative Dark CSS
+# Session state initialization for risk parameters
+if "kelly_mult" not in st.session_state:
+    st.session_state["kelly_mult"] = float(config.DEFAULT_KELLY_FRACTION)
+if "min_edge_pct" not in st.session_state:
+    st.session_state["min_edge_pct"] = float(config.DEFAULT_MIN_EDGE)
+if "custom_bankroll" not in st.session_state:
+    st.session_state["custom_bankroll"] = None
+
+# Sleek Minimalist & Mobile-Responsive CSS
 st.markdown("""
 <style>
-    .main { background-color: #0b0f19; color: #e2e8f0; }
+    .main { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .stSelectbox, .stNumberInput, .stSlider { color: #f8fafc; }
-    div[data-testid="stMetricValue"] { font-size: 26px; font-weight: 700; color: #f8fafc; }
-    div[data-testid="stMetricLabel"] { font-size: 13px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }
-    .card-neutral { background-color: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 18px; }
-    .card-emerald { background-color: #06281e; border: 1px solid #059669; border-radius: 8px; padding: 20px; }
-    .card-slate { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 18px; }
+    div[data-testid="stMetricValue"] { font-size: clamp(18px, 3vw, 26px); font-weight: 700; color: #f8fafc; }
+    div[data-testid="stMetricLabel"] { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }
+    .card-neutral { background-color: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    .card-emerald { background-color: #06281e; border: 1px solid #059669; border-radius: 8px; padding: 18px; margin-bottom: 12px; }
+    .card-slate { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
+    
+    div[data-testid="stRadio"] > div {
+        display: flex;
+        flex-direction: column;
+        gap: 6px;
+    }
+    div[data-testid="stRadio"] label {
+        background-color: #111827;
+        border: 1px solid #1f2937;
+        border-radius: 8px;
+        padding: 10px 14px;
+        margin: 0 !important;
+        cursor: pointer;
+        transition: all 0.15s ease-in-out;
+        width: 100%;
+    }
+    div[data-testid="stRadio"] label:hover {
+        background-color: #1f2937;
+        border-color: #374151;
+    }
+    div[data-testid="stRadio"] label[data-checked="true"],
+    div[data-testid="stRadio"] label:has(input:checked) {
+        background-color: #064e3b !important;
+        border-color: #10b981 !important;
+        color: #ecfdf5 !important;
+        font-weight: 600;
+    }
+    div[data-testid="stRadio"] input[type="radio"] {
+        display: none !important;
+    }
+
+    @media (max-width: 768px) {
+        .block-container {
+            padding: 1rem 0.5rem !important;
+        }
+        .card-emerald, .card-slate, .card-neutral {
+            padding: 12px !important;
+        }
+    }
 </style>
 """, unsafe_allow_html=True)
+
+live_ledger_balance = BankrollLedger.get_current_balance()
+active_bankroll = st.session_state["custom_bankroll"] if st.session_state["custom_bankroll"] is not None else live_ledger_balance
+kelly_mult = st.session_state["kelly_mult"]
+min_edge_pct = st.session_state["min_edge_pct"]
 
 # ================= SIDEBAR NAVIGATION =================
 st.sidebar.markdown("### QUANTITATIVE ANALYTICS")
@@ -60,7 +112,7 @@ sport = "mlb" if "MLB" in sport_choice else "nba"
 sport_label = "MLB" if sport == "mlb" else "NBA"
 
 nav_selection = st.sidebar.radio(
-    "Navigation",
+    "Navigation Menu",
     options=[
         "Matchup Forecast",
         "Bankroll & Ledger",
@@ -73,20 +125,12 @@ nav_selection = st.sidebar.radio(
 )
 
 st.sidebar.markdown("---")
-st.sidebar.markdown("### Risk & Sizing Parameters")
-
-# Pull live balance from ledger
-current_ledger_balance = BankrollLedger.get_current_balance()
-bankroll_val = st.sidebar.number_input(
-    f"Active Bankroll ({config.DEFAULT_CURRENCY})",
-    min_value=10.0,
-    max_value=10000000.0,
-    value=float(current_ledger_balance),
-    step=50.0,
-    help="Live balance sourced directly from your ledger."
-)
-kelly_mult = st.sidebar.slider("Fractional Kelly", min_value=0.05, max_value=0.50, value=0.15, step=0.01, help="0.15 = 15% Kelly")
-min_edge_pct = st.sidebar.slider("Min Edge Threshold (%)", min_value=0.5, max_value=10.0, value=2.5, step=0.5) / 100.0
+st.sidebar.markdown(f"""
+<div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; text-align: center;">
+    <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Active Balance</div>
+    <div style="font-size: 20px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</div>
+</div>
+""", unsafe_allow_html=True)
 
 @st.cache_resource
 def load_sport_models_and_data(target_sport: str):
@@ -240,7 +284,7 @@ if nav_selection == "Matchup Forecast":
             st.info(f"NO VALUE BET IDENTIFIED: Neither team offers an edge exceeding the {min_edge_pct*100:.1f}% minimum threshold. Model recommends PASS.")
         else:
             for opp in opps:
-                sizing = size_bet(opp["model_prob"], opp["decimal_odds"], bankroll_val, kelly_multiplier=kelly_mult)
+                sizing = size_bet(opp["model_prob"], opp["decimal_odds"], active_bankroll, kelly_multiplier=kelly_mult)
                 bet_team = h_name if opp["side"] == "home" else a_name
                 stake_amt = sizing["stake"]
                 payout = round(stake_amt * opp["decimal_odds"], 2)
@@ -248,77 +292,92 @@ if nav_selection == "Matchup Forecast":
 
                 st.markdown(f"""
                 <div class="card-emerald">
-                    <div style="display: flex; justify-content: space-between; align-items: center;">
-                        <h3 style="color: #ecfdf5; margin: 0;">RECOMMENDED BET: {bet_team.upper()} TO WIN</h3>
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
+                        <h3 style="color: #ecfdf5; margin: 0; font-size: clamp(16px, 2.5vw, 20px);">RECOMMENDED BET: {bet_team.upper()} TO WIN</h3>
                         <span style="background-color: #047857; color: white; padding: 4px 12px; border-radius: 16px; font-weight: 700; font-size: 13px;">+{opp['edge']*100:.1f}% EDGE</span>
                     </div>
                     <hr style="border: 0; border-top: 1px solid #065f46; margin: 12px 0;">
-                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; text-align: center;">
+                    <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; text-align: center;">
                         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
                             <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Stake</div>
-                            <div style="font-size: 22px; font-weight: bold; color: #ffffff;">{config.DEFAULT_CURRENCY}{stake_amt:,.2f}</div>
-                            <div style="font-size: 11px; color: #6ee7b7;">{sizing['stake_pct']:.1f}% of bankroll</div>
+                            <div style="font-size: clamp(18px, 2.5vw, 22px); font-weight: bold; color: #ffffff;">{config.DEFAULT_CURRENCY}{stake_amt:,.2f}</div>
+                            <div style="font-size: 11px; color: #6ee7b7;">{sizing['stake_pct']:.1f}% of {config.DEFAULT_CURRENCY}{active_bankroll:,.0f}</div>
                         </div>
                         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
                             <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Bookmaker Odds</div>
-                            <div style="font-size: 22px; font-weight: bold; color: #ffffff;">{opp['decimal_odds']:.2f}</div>
+                            <div style="font-size: clamp(18px, 2.5vw, 22px); font-weight: bold; color: #ffffff;">{opp['decimal_odds']:.2f}</div>
                             <div style="font-size: 11px; color: #6ee7b7;">Fair: {1.0/opp['model_prob']:.2f}</div>
                         </div>
                         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
                             <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Model Win Prob</div>
-                            <div style="font-size: 22px; font-weight: bold; color: #ffffff;">{opp['model_prob']*100:.1f}%</div>
+                            <div style="font-size: clamp(18px, 2.5vw, 22px); font-weight: bold; color: #ffffff;">{opp['model_prob']*100:.1f}%</div>
                             <div style="font-size: 11px; color: #6ee7b7;">Market: {opp['fair_implied_prob']*100:.1f}%</div>
                         </div>
                         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
                             <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Potential Profit</div>
-                            <div style="font-size: 22px; font-weight: bold; color: #34d399;">+{config.DEFAULT_CURRENCY}{profit:,.2f}</div>
+                            <div style="font-size: clamp(18px, 2.5vw, 22px); font-weight: bold; color: #34d399;">+{config.DEFAULT_CURRENCY}{profit:,.2f}</div>
                             <div style="font-size: 11px; color: #a7f3d0;">Payout: {config.DEFAULT_CURRENCY}{payout:,.2f}</div>
                         </div>
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
 
-                # Quick Log Button
-                st.write("")
-                btn_c1, btn_c2 = st.columns([1, 4])
-                with btn_c1:
-                    if st.button("Log Wager Result", key="log_wager_modal_btn"):
-                        st.session_state["pending_log_team"] = bet_team
-                        st.session_state["pending_log_stake"] = stake_amt
-                        st.session_state["pending_log_odds"] = opp["decimal_odds"]
-                        st.session_state["pending_log_sport"] = sport
-                        st.info("Fill result in the Bankroll & Ledger tab or quick record below.")
-
-                if st.session_state.get("pending_log_team") == bet_team:
-                    with st.expander("Record This Wager Outcome", expanded=True):
-                        rec_res = st.radio("Outcome", options=["Won", "Lost"], horizontal=True, key="quick_rec_radio")
-                        if st.button("Confirm & Save to Ledger", type="primary", key="quick_rec_confirm"):
-                            BankrollLedger.record_bet(
-                                sport=sport,
-                                team=bet_team,
-                                stake=stake_amt,
-                                odds=opp["decimal_odds"],
-                                is_win=(rec_res == "Won")
-                            )
-                            st.success(f"Wager on {bet_team} successfully recorded into ledger!")
-                            st.session_state.pop("pending_log_team", None)
-                            st.rerun()
+                with st.expander("Record This Wager Outcome into Ledger", expanded=False):
+                    q_res = st.radio("Outcome", options=["Won", "Lost"], horizontal=True, key=f"q_rec_res_{bet_team}")
+                    if st.button("Save Wager to Ledger", type="primary", key=f"q_rec_btn_{bet_team}"):
+                        BankrollLedger.record_bet(
+                            sport=sport,
+                            team=bet_team,
+                            stake=stake_amt,
+                            odds=opp["decimal_odds"],
+                            is_win=(q_res == "Won")
+                        )
+                        st.success(f"Wager on {bet_team} successfully saved!")
+                        st.rerun()
 
 # ================= 2. BANKROLL & LEDGER =================
 elif nav_selection == "Bankroll & Ledger":
     st.title("Bankroll & Transaction Ledger")
-    st.caption("Personal balance tracking, deposits, withdrawals, and wager history in Philippine Pesos (₱).")
+    st.caption("Personal financial tracking, risk parameters, deposits, withdrawals, and ledger history.")
 
     metrics = BankrollLedger.get_ledger_metrics()
 
-    # Summary Metrics Row
-    m1, m2, m3, m4, m5, m6 = st.columns(6)
+    # Summary Metrics (Auto wrap on mobile)
+    m1, m2, m3, m4 = st.columns(4)
     m1.metric("Current Balance", f"{config.DEFAULT_CURRENCY}{metrics['current_balance']:,.2f}")
     m2.metric("Net Betting PnL", f"{config.DEFAULT_CURRENCY}{metrics['net_betting_pnl']:+,.2f}")
     m3.metric("Total Deposits", f"{config.DEFAULT_CURRENCY}{metrics['total_deposits']:,.2f}")
     m4.metric("Total Withdrawals", f"{config.DEFAULT_CURRENCY}{metrics['total_withdrawals']:,.2f}")
-    m5.metric("Win Rate", f"{metrics['win_rate']:.1f}%", f"{metrics['wins']}W - {metrics['losses']}L")
-    m6.metric("Betting ROI", f"{metrics['roi_pct']:+.2f}%")
+
+    m5, m6, m7, m8 = st.columns(4)
+    m5.metric("Total Bets Logged", f"{metrics['total_bets']}")
+    m6.metric("Record (W - L)", f"{metrics['wins']}W - {metrics['losses']}L")
+    m7.metric("Win Rate", f"{metrics['win_rate']:.1f}%")
+    m8.metric("All-Time ROI", f"{metrics['roi_pct']:+.2f}%")
+
+    st.markdown("---")
+
+    # Risk & Sizing Parameters Card
+    st.markdown("##### Risk & Position Sizing Parameters")
+    with st.expander("Configure Sizing & Edge Criteria", expanded=True):
+        p_col1, p_col2 = st.columns(2)
+        with p_col1:
+            st.session_state["kelly_mult"] = st.slider(
+                "Fractional Kelly Multiplier",
+                min_value=0.05,
+                max_value=0.50,
+                value=float(st.session_state["kelly_mult"]),
+                step=0.01,
+                help="0.15 = 15% Fractional Kelly"
+            )
+        with p_col2:
+            st.session_state["min_edge_pct"] = st.slider(
+                "Minimum Edge Threshold (%)",
+                min_value=0.5,
+                max_value=10.0,
+                value=float(st.session_state["min_edge_pct"] * 100.0),
+                step=0.5
+            ) / 100.0
 
     st.markdown("---")
     act_col1, act_col2, act_col3 = st.columns(3)
@@ -333,7 +392,7 @@ elif nav_selection == "Bankroll & Ledger":
                 f_outcome = st.radio("Result", options=["Won", "Lost"], horizontal=True, key="f_outcome")
                 f_note = st.text_input("Note (Optional)", value="", key="f_note")
                 
-                if st.form_submit_button("Record Bet", type="primary"):
+                if st.form_submit_button("Save Wager", type="primary"):
                     res = BankrollLedger.record_bet(
                         sport=f_sport,
                         team=f_team,
@@ -362,10 +421,10 @@ elif nav_selection == "Bankroll & Ledger":
                     st.rerun()
 
     with act_col3:
-        with st.expander("Reset / Adjust Capital", expanded=False):
+        with st.expander("Set Starting Capital", expanded=False):
             with st.form("form_reset"):
-                f_init = st.number_input(f"New Starting Capital ({config.DEFAULT_CURRENCY})", min_value=50.0, value=1200.0, step=100.0)
-                if st.form_submit_button("Reset Starting Capital"):
+                f_init = st.number_input(f"New Base Capital ({config.DEFAULT_CURRENCY})", min_value=50.0, value=1200.0, step=100.0)
+                if st.form_submit_button("Reset Base Capital"):
                     BankrollLedger.reset_bankroll(f_init)
                     st.success(f"Bankroll reset to {config.DEFAULT_CURRENCY}{f_init:,.2f}!")
                     st.rerun()
@@ -380,7 +439,12 @@ elif nav_selection == "Bankroll & Ledger":
             labels={"created_at": "Timestamp", "balance_after": f"Balance ({config.DEFAULT_CURRENCY})"}
         )
         fig_bal.update_traces(line=dict(color="#10b981", width=2.5))
-        fig_bal.update_layout(template="plotly_dark", plot_bgcolor="#0b0f19", paper_bgcolor="#0b0f19")
+        fig_bal.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="#0b0f19",
+            paper_bgcolor="#0b0f19",
+            margin=dict(l=20, r=20, t=30, b=20)
+        )
         st.plotly_chart(fig_bal, use_container_width=True)
 
         st.markdown("##### Chronological Transaction History")
@@ -482,13 +546,15 @@ elif nav_selection == "Backtest Simulation":
         return bt.run_backtest(season_filter=season_val)
 
     season_arg = None if bt_season == "All Seasons" else bt_season
-    res = run_cached_backtest(sport, bankroll_val, kelly_mult, min_edge_pct, bt_compound, tuple(bt_markets), season_arg)
+    res = run_cached_backtest(sport, active_bankroll, kelly_mult, min_edge_pct, bt_compound, tuple(bt_markets), season_arg)
 
-    r1, r2, r3, r4, r5, r6 = st.columns(6)
+    r1, r2, r3, r4 = st.columns(4)
     r1.metric("Total Wagers", f"{res.get('total_bets', 0):,}")
     r2.metric("Win Rate", f"{res.get('win_rate', 0.0)}%", f"{res.get('wins', 0)}W - {res.get('losses', 0)}L")
     r3.metric(f"Net Profit ({config.DEFAULT_CURRENCY})", f"{config.DEFAULT_CURRENCY}{res.get('pnl', 0.0):,.2f}")
     r4.metric("ROI (%)", f"{res.get('roi_pct', 0.0):+.2f}%")
+
+    r5, r6 = st.columns(2)
     r5.metric("Max Drawdown", f"{res.get('max_drawdown_pct', 0.0):.2f}%", f"{config.DEFAULT_CURRENCY}{res.get('max_drawdown_dollars', 0.0):,.2f}")
     r6.metric("Beat Closing Line", f"{res.get('beat_closing_pct', 0.0)}%", f"Avg CLV: {res.get('avg_clv_pct', 0.0):+.2f}%")
 
@@ -499,7 +565,12 @@ elif nav_selection == "Backtest Simulation":
             labels={"game_date": "Date", "bankroll": f"Bankroll ({config.DEFAULT_CURRENCY})"}
         )
         fig_equity.update_traces(line=dict(color="#10b981", width=2.5))
-        fig_equity.update_layout(template="plotly_dark", plot_bgcolor="#0b0f19", paper_bgcolor="#0b0f19")
+        fig_equity.update_layout(
+            template="plotly_dark",
+            plot_bgcolor="#0b0f19",
+            paper_bgcolor="#0b0f19",
+            margin=dict(l=20, r=20, t=30, b=20)
+        )
         st.plotly_chart(fig_equity, use_container_width=True)
 
     if res["bets"]:
