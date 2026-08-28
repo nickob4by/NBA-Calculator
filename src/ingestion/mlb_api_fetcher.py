@@ -77,17 +77,28 @@ def fetch_mlb_season_schedule(season: str) -> pd.DataFrame:
         logger.warning(f"Error fetching from MLB StatsAPI for {season}: {e}")
         return pd.DataFrame()
 
-DEFAULT_MLB_5YR_SEASONS = ["2020", "2021", "2022", "2023", "2024", "2025"]
+from datetime import datetime
 
-def generate_mlb_seed_dataset_if_empty(seasons: List[str] = DEFAULT_MLB_5YR_SEASONS, force_refresh: bool = False) -> int:
+def get_dynamic_mlb_seasons(start_year: int = 2020) -> List[str]:
+    curr_year = datetime.now().year
+    return [str(y) for y in range(start_year, max(curr_year + 1, 2026))]
+
+DEFAULT_MLB_5YR_SEASONS = get_dynamic_mlb_seasons()
+
+def generate_mlb_seed_dataset_if_empty(seasons: Optional[List[str]] = None, force_refresh: bool = False) -> int:
     """
-    Generates realistic 6-year historical MLB dataset seed across seasons (2020-2025)
-    with realistic baseball runs distributions, pitcher/batter sabermetrics, and 162-game schedule.
+    Generates realistic historical MLB dataset across seasons up to the current calendar year.
+    Automatically discovers new upcoming seasons (e.g. 2026, 2027) upon yearly updates.
     """
+    if seasons is None:
+        seasons = get_dynamic_mlb_seasons()
+
+    latest_target_season = seasons[-1]
     count = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb'")["c"]
-    has_2025 = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb' AND season='2025'")["c"] > 0
-    if not force_refresh and count >= 14000 and has_2025:
-        logger.info(f"Database already contains {count} MLB games including 2025. Skipping seed generation.")
+    has_latest = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb' AND season=?", (latest_target_season,))["c"] > 0
+
+    if not force_refresh and count >= (len(seasons) * 2300) and has_latest:
+        logger.info(f"Database already contains {count} MLB games up to {latest_target_season}. Skipping seed generation.")
         return count
 
     logger.info(f"Generating comprehensive realistic 5-season MLB seed dataset ({', '.join(seasons)})...")

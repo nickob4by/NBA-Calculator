@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 import pandas as pd
 import numpy as np
 from typing import List
@@ -10,7 +10,17 @@ import config
 
 logger = logging.getLogger(__name__)
 
-DEFAULT_NBA_5YR_SEASONS = ["2020-21", "2021-22", "2022-23", "2023-24", "2024-25"]
+from datetime import datetime
+
+def get_dynamic_nba_seasons(start_year: int = 2020) -> List[str]:
+    curr_year = datetime.now().year
+    seasons = []
+    for y in range(start_year, max(curr_year + 1, 2025)):
+        next_y_short = str(y + 1)[-2:]
+        seasons.append(f"{y}-{next_y_short}")
+    return seasons
+
+DEFAULT_NBA_5YR_SEASONS = get_dynamic_nba_seasons()
 
 def sync_season(season: str) -> int:
     """
@@ -105,15 +115,24 @@ def process_and_store_season_data(df_logs: pd.DataFrame, season: str) -> int:
     logger.info(f"Stored {len(games_merged)} NBA games and {len(df_logs)} game logs for season {season}.")
     return len(games_merged)
 
-def generate_seed_dataset_if_empty(seasons: List[str] = DEFAULT_NBA_5YR_SEASONS) -> int:
+from typing import Optional
+
+def generate_seed_dataset_if_empty(seasons: Optional[List[str]] = None, force_refresh: bool = False) -> int:
     """
-    Generates realistic 5-year historical NBA dataset seed (2020-21 through 2024-25).
+    Generates realistic historical NBA dataset seed dynamically covering seasons up to the current calendar year.
+    Automatically discovers and adds upcoming seasons (e.g. 2025-26, 2026-27).
     """
+    if seasons is None:
+        seasons = get_dynamic_nba_seasons()
+
+    latest_target_season = seasons[-1]
     count = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='nba'")["c"]
-    if count >= 4500:
+    has_latest = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='nba' AND season=?", (latest_target_season,))["c"] > 0
+
+    if not force_refresh and count >= (len(seasons) * 1000) and has_latest:
         return count
 
-    logger.info(f"Generating comprehensive 5-year NBA historical dataset ({', '.join(seasons)})...")
+    logger.info(f"Generating comprehensive NBA historical dataset up to {latest_target_season} ({', '.join(seasons)})...")
     all_logs = []
     rng = np.random.RandomState(42)
     team_ids = list(config.NBA_TEAMS.keys())
