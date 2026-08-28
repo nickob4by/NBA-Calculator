@@ -858,32 +858,37 @@ elif nav_selection == "Data & Settings":
 
     with col_s2:
         st.markdown("##### Update Team & Player Statistics")
-        st.caption("Fetches the latest official game logs, starting pitcher rotations, and advanced ratings.")
+        st.caption("Fetches the latest official game logs, starting pitcher rotations, and retrains all Machine Learning models.")
         
         update_target = st.selectbox(
             "Select Update Scope",
-            options=["All Sports (NBA & MLB)", "NBA (2024-25 Latest)", "MLB (2024 Latest)"],
+            options=["All Sports (NBA & MLB)", "NBA (2024-25 Latest)", "MLB (2020-2025 Complete)"],
             index=0
         )
         
-        if st.button("Update All Latest Data", type="primary", key="btn_update_latest_data"):
-            with st.status("Importing latest sports data...", expanded=True) as status:
-                st.write("1. Connecting to sports datasets...")
+        if st.button("Update All Latest Data & Retrain Models", type="primary", key="btn_update_latest_data"):
+            with st.status("Syncing latest sports data and retraining models...", expanded=True) as status:
+                from src.models.train import train_all_models
+                st.write("1. Connecting to sports data pipeline...")
                 
                 if "NBA" in update_target or "All" in update_target:
                     st.write("2. Syncing NBA 2024-25 game logs, rosters, and advanced Four Factors...")
                     generate_seed_dataset_if_empty()
+                    st.write("3. Retraining NBA margin & win probability models on latest data...")
+                    train_all_models(sport="nba")
                 
                 if "MLB" in update_target or "All" in update_target:
-                    st.write("3. Syncing MLB 2024 game scores, starting pitcher rotations, and sabermetrics...")
-                    generate_mlb_seed_dataset_if_empty()
+                    st.write("4. Syncing MLB 2020-2025 seasons, starting rotations, and sabermetrics...")
+                    generate_mlb_seed_dataset_if_empty(force_refresh=True)
+                    st.write("5. Retraining MLB run margin & win probability models on latest data...")
+                    train_all_models(sport="mlb")
                 
-                st.write("4. Clearing feature caches and refreshing analytics engine...")
+                st.write("6. Clearing feature caches and refreshing analytics engine...")
                 st.cache_resource.clear()
                 st.cache_data.clear()
                 
-                status.update(label="All team & player statistics successfully updated!", state="complete", expanded=False)
-            st.success("Database and sports stats are now completely up-to-date.")
+                status.update(label="All team data, seasons, and ML models successfully updated & retrained!", state="complete", expanded=False)
+            st.success("Database, 2025 seasons, and ML models are completely up-to-date and retrained.")
             st.rerun()
 
     st.markdown("---")
