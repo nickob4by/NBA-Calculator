@@ -31,7 +31,7 @@ st.set_page_config(
     page_title="Quantitative Sportsbook Analytics",
     page_icon="■",
     layout="wide",
-    initial_sidebar_state="auto"
+    initial_sidebar_state="collapsed"
 )
 
 # Session state initialization for risk parameters
@@ -42,31 +42,52 @@ if "min_edge_pct" not in st.session_state:
 if "custom_bankroll" not in st.session_state:
     st.session_state["custom_bankroll"] = None
 
-# Sleek Minimalist & Mobile-Responsive CSS
+# Sleek Minimalist Full-Width & Top Navigation CSS
 st.markdown("""
 <style>
+    /* Hide sidebar and toggle completely */
+    [data-testid="stSidebar"], section[data-testid="stSidebar"] { display: none !important; }
+    [data-testid="collapsedControl"], button[kind="header"] { display: none !important; }
+    
+    /* Global Base */
     .main { background-color: #0b0f19; color: #e2e8f0; font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; }
     .stSelectbox, .stNumberInput, .stSlider { color: #f8fafc; }
+    
+    /* Full-width container */
+    .block-container {
+        padding-top: 1.25rem !important;
+        padding-bottom: 2rem !important;
+        max-width: 1280px !important;
+        margin: 0 auto !important;
+    }
+
     div[data-testid="stMetricValue"] { font-size: clamp(18px, 3vw, 26px); font-weight: 700; color: #f8fafc; }
     div[data-testid="stMetricLabel"] { font-size: 11px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; }
+    
     .card-neutral { background-color: #131b2e; border: 1px solid #1e293b; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
     .card-emerald { background-color: #06281e; border: 1px solid #059669; border-radius: 8px; padding: 18px; margin-bottom: 12px; }
     .card-slate { background-color: #0f172a; border: 1px solid #334155; border-radius: 8px; padding: 16px; margin-bottom: 12px; }
     
+    /* Top Horizontal Header Navigation Menu */
     div[data-testid="stRadio"] > div {
-        display: flex;
-        flex-direction: column;
-        gap: 6px;
+        display: flex !important;
+        flex-direction: row !important;
+        gap: 8px !important;
+        flex-wrap: wrap !important;
+        width: 100% !important;
     }
     div[data-testid="stRadio"] label {
         background-color: #111827;
         border: 1px solid #1f2937;
         border-radius: 8px;
-        padding: 10px 14px;
+        padding: 9px 18px;
         margin: 0 !important;
         cursor: pointer;
         transition: all 0.15s ease-in-out;
-        width: 100%;
+        flex: 1;
+        text-align: center;
+        min-width: 140px;
+        justify-content: center;
     }
     div[data-testid="stRadio"] label:hover {
         background-color: #1f2937;
@@ -90,6 +111,10 @@ st.markdown("""
         .card-emerald, .card-slate, .card-neutral {
             padding: 12px !important;
         }
+        div[data-testid="stRadio"] label {
+            min-width: 45% !important;
+            padding: 8px 10px !important;
+        }
     }
 </style>
 """, unsafe_allow_html=True)
@@ -99,36 +124,46 @@ active_bankroll = st.session_state["custom_bankroll"] if st.session_state["custo
 kelly_mult = st.session_state["kelly_mult"]
 min_edge_pct = st.session_state["min_edge_pct"]
 
-# ================= SIDEBAR NAVIGATION =================
-st.sidebar.markdown("### QUANTITATIVE ANALYTICS")
-st.sidebar.caption("NBA & MLB Statistical Valuation Engine")
+# ================= TOP HEADER BAR =================
+head_c1, head_c2, head_c3 = st.columns([2.6, 1.2, 1.2])
 
-sport_choice = st.sidebar.selectbox(
-    "Sport",
-    options=["NBA (Basketball)", "MLB (Baseball)"],
-    index=0
-)
-sport = "mlb" if "MLB" in sport_choice else "nba"
-sport_label = "MLB" if sport == "mlb" else "NBA"
+with head_c1:
+    st.markdown("<h3 style='margin:0; padding:0; color:#ffffff;'>QUANTITATIVE ANALYTICS</h3>", unsafe_allow_html=True)
+    st.caption("NBA & MLB Statistical Valuation Engine")
 
-nav_selection = st.sidebar.radio(
-    "Navigation Menu",
+with head_c2:
+    sport_choice = st.selectbox(
+        "Sport",
+        options=["NBA (Basketball)", "MLB (Baseball)"],
+        index=0,
+        label_visibility="collapsed"
+    )
+    sport = "mlb" if "MLB" in sport_choice else "nba"
+    sport_label = "MLB" if sport == "mlb" else "NBA"
+
+with head_c3:
+    st.markdown(f"""
+    <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 7px 12px; text-align: center;">
+        <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Balance: </span>
+        <span style="font-size: 16px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</span>
+    </div>
+    """, unsafe_allow_html=True)
+
+# Top Horizontal Navigation Tabs
+nav_selection = st.radio(
+    "Navigation Header",
     options=[
         "Matchup Forecast",
         "Bankroll & Ledger",
         "Team Explorer",
         "Data & Settings"
     ],
-    index=0
+    index=0,
+    horizontal=True,
+    label_visibility="collapsed"
 )
 
-st.sidebar.markdown("---")
-st.sidebar.markdown(f"""
-<div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 12px; text-align: center;">
-    <div style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Active Balance</div>
-    <div style="font-size: 20px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</div>
-</div>
-""", unsafe_allow_html=True)
+st.markdown("<hr style='border:0; border-top: 1px solid #1f2937; margin: 10px 0 20px 0;'>", unsafe_allow_html=True)
 
 @st.cache_resource
 def load_sport_models_and_data(target_sport: str):
