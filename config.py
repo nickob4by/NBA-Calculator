@@ -40,7 +40,7 @@ DEFAULT_CURRENCY_CODE = "PHP"
 DEFAULT_KELLY_FRACTION = 0.15     # 15% Fractional Kelly
 DEFAULT_MIN_EDGE = 0.025          # 2.5% minimum edge
 DEFAULT_MAX_BANKROLL_PCT = 0.04   # 4.0% max risk per bet
-DEFAULT_STARTING_BANKROLL = 1200.0 # ₱1,200 PHP
+DEFAULT_STARTING_BANKROLL = 100.0  # ₱100 PHP
 MIN_BET_AMOUNT = 1.0              # ₱1.00 min micro-stake
 
 # Supported Sports

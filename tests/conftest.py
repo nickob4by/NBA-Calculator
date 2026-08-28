@@ -1,5 +1,6 @@
 import pytest
 import config
+from pathlib import Path
 from src.db.database import Database
 import src.db.database as db_mod
 import src.betting.ledger as ledger_mod
@@ -12,7 +13,9 @@ def isolate_test_database(tmp_path_factory):
     
     test_db = Database(db_path=test_db_file)
     original_db = db_mod.db
+    original_sync_dir = sync_mod.SYNC_DIR
     
+    sync_mod.SYNC_DIR = temp_dir / 'sync'
     db_mod.db = test_db
     ledger_mod.db = test_db
     sync_mod.db = test_db
@@ -37,3 +40,10 @@ def isolate_test_database(tmp_path_factory):
     db_mod.db = original_db
     ledger_mod.db = original_db
     sync_mod.db = original_db
+    sync_mod.SYNC_DIR = original_sync_dir
+
+    try:
+        sync_mod.GitHubDataSync.import_data_snapshot_if_exists()
+    except Exception:
+        pass
+

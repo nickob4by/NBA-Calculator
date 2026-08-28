@@ -13,11 +13,21 @@ class BankrollLedger:
     def get_current_balance() -> float:
         """
         Returns the latest bankroll balance.
-        If no transactions exist, initializes with stored starting_bankroll or DEFAULT_STARTING_BANKROLL.
+        If no transactions exist, attempts auto-restoring from sync snapshot before initializing with DEFAULT_STARTING_BANKROLL.
         """
         row = db.fetch_one("SELECT balance_after FROM bankroll_transactions ORDER BY id DESC LIMIT 1")
         if row is not None:
             return round(float(row["balance_after"]), 2)
+
+        # Attempt to auto-restore from sync snapshot first
+        try:
+            from src.db.github_sync import GitHubDataSync
+            if GitHubDataSync.import_data_snapshot_if_exists():
+                row = db.fetch_one("SELECT balance_after FROM bankroll_transactions ORDER BY id DESC LIMIT 1")
+                if row is not None:
+                    return round(float(row["balance_after"]), 2)
+        except Exception:
+            pass
 
         # Initialize default capital if ledger is empty
         stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
@@ -28,6 +38,7 @@ class BankrollLedger:
                 VALUES ('INITIAL', ?, ?, 'general', 'Initial Starting Capital')
             """, (stored_init, stored_init))
         return stored_init
+
 
     @staticmethod
     def deposit(amount: float, note: str = "Deposit") -> float:
@@ -141,10 +152,12 @@ class BankrollLedger:
         return BankrollLedger.get_current_balance()
 
     @staticmethod
-    def reset_bankroll(initial_amount: float = 1200.0) -> float:
+    def reset_bankroll(initial_amount: Optional[float] = None) -> float:
         """
         Clears ledger history and resets starting capital.
         """
+        if initial_amount is None:
+            initial_amount = config.DEFAULT_STARTING_BANKROLL
         initial_amount = round(abs(float(initial_amount)), 2)
         db.set_setting("starting_bankroll", str(initial_amount))
         with db.get_connection() as conn:
@@ -155,6 +168,7 @@ class BankrollLedger:
                 VALUES ('INITIAL', ?, ?, 'general', 'Starting Capital')
             """, (initial_amount, initial_amount))
         return initial_amount
+
 
     @staticmethod
     def get_ledger_history() -> pd.DataFrame:

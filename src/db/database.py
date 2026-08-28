@@ -34,6 +34,17 @@ class Database:
             self._migrate(conn)
             conn.executescript(schema_sql)
 
+        # Automatically restore snapshot from data/sync/ for production DB on first initialization
+        try:
+            if self.db_path.resolve() == Path(config.DB_PATH).resolve():
+                from src.db.github_sync import GitHubDataSync
+                row = self.fetch_one("SELECT COUNT(*) as c FROM bankroll_transactions")
+                if row and row["c"] == 0:
+                    GitHubDataSync.import_data_snapshot_if_exists()
+        except Exception:
+            pass
+
+
     def _migrate(self, conn):
         """Ensures any new multi-sport and player columns are added if tables already existed."""
         tables_to_migrate = [
