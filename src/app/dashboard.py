@@ -170,61 +170,89 @@ with tab_predict:
         a_name = config.get_team_name(away_team_id, sport=sport)
 
         st.markdown("---")
-        m1, m2, m3, m4 = st.columns(4)
-        m1.metric(f"🏠 {h_name} Win Prob", f"{pred_p_home*100:.1f}%", f"Fair: {1.0/pred_p_home:.2f}")
-        m2.metric(f"✈️ {a_name} Win Prob", f"{pred_p_away*100:.1f}%", f"Fair: {1.0/pred_p_away:.2f}")
-        m3.metric(f"Projected {score_unit} Margin", f"{pred_margin:+.2f} {score_unit.lower()}", f"{h_name if pred_margin > 0 else a_name} favored")
-        m4.metric(f"Projected Total {score_unit}", f"{pred_total:.2f} {score_unit.lower()}", "Combined Score")
+        # Winner Forecast Metrics
+        w_col1, w_col2 = st.columns(2)
+        with w_col1:
+            h_is_fav = pred_p_home >= 0.50
+            h_badge = "🔥 PREDICTED WINNER" if h_is_fav else "UNDERDOG"
+            st.markdown(f"""
+            <div style="background-color: {'#132e24' if h_is_fav else '#1e2530'}; border: 1px solid {'#10b981' if h_is_fav else '#2d3748'}; border-radius: 10px; padding: 18px;">
+                <span style="font-size: 13px; color: {'#34d399' if h_is_fav else '#9ca3af'}; font-weight: bold;">{h_badge}</span>
+                <h2 style="margin: 4px 0; color: white;">🏠 {h_name}</h2>
+                <h1 style="margin: 0; color: {'#10b981' if h_is_fav else '#f3f4f6'}; font-size: 42px;">{pred_p_home*100:.1f}%</h1>
+                <p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 14px;">Fair True Price: <b>{1.0/pred_p_home:.2f}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        st.markdown("### 🎲 Sportsbook Lines & Expected Value Engine")
-        c_ml, c_sp, c_tot = st.columns(3)
+        with w_col2:
+            a_is_fav = pred_p_away > 0.50
+            a_badge = "🔥 PREDICTED WINNER" if a_is_fav else "UNDERDOG"
+            st.markdown(f"""
+            <div style="background-color: {'#132e24' if a_is_fav else '#1e2530'}; border: 1px solid {'#10b981' if a_is_fav else '#2d3748'}; border-radius: 10px; padding: 18px;">
+                <span style="font-size: 13px; color: {'#34d399' if a_is_fav else '#9ca3af'}; font-weight: bold;">{a_badge}</span>
+                <h2 style="margin: 4px 0; color: white;">✈️ {a_name}</h2>
+                <h1 style="margin: 0; color: {'#10b981' if a_is_fav else '#f3f4f6'}; font-size: 42px;">{pred_p_away*100:.1f}%</h1>
+                <p style="margin: 4px 0 0 0; color: #9ca3af; font-size: 14px;">Fair True Price: <b>{1.0/pred_p_away:.2f}</b></p>
+            </div>
+            """, unsafe_allow_html=True)
 
-        with c_ml:
-            st.markdown("**Moneyline (Decimal Odds)**")
+        st.markdown("### 🎲 Enter Sportsbook Odds (To Win)")
+        c_odd1, c_odd2 = st.columns(2)
+
+        with c_odd1:
             def_h_ml = round(1.0 / (pred_p_home * 1.025), 2)
+            input_h_ml = st.number_input(f"{h_name} Offered Odds (Decimal)", value=float(def_h_ml), step=0.05, key="input_h_ml")
+
+        with c_odd2:
             def_a_ml = round(1.0 / (pred_p_away * 1.025), 2)
-            input_h_ml = st.number_input(f"{config.get_team_abbrev(home_team_id, sport=sport)} Odds", value=float(def_h_ml), step=0.05)
-            input_a_ml = st.number_input(f"{config.get_team_abbrev(away_team_id, sport=sport)} Odds", value=float(def_a_ml), step=0.05)
+            input_a_ml = st.number_input(f"{a_name} Offered Odds (Decimal)", value=float(def_a_ml), step=0.05, key="input_a_ml")
 
-        with c_sp:
-            st.markdown(f"**{spread_title}**")
-            def_spread = -1.5 if sport == "mlb" else (round(-pred_margin * 2.0) / 2.0)
-            input_spread = st.number_input("Home Line", value=float(def_spread), step=0.5)
-            input_sp_odds = st.number_input("Home Price (e.g. 2.10 or 1.91)", value=2.10 if sport=="mlb" else 1.91, step=0.01)
-
-        with c_tot:
-            st.markdown(f"**Over / Under {score_unit}**")
-            def_tot_line = 8.5 if sport == "mlb" else (round(pred_total * 2.0) / 2.0)
-            input_total = st.number_input("Total Line", value=float(def_tot_line), step=0.5)
-            input_tot_odds = st.number_input("Totals Price (e.g. 1.91)", value=1.91, step=0.01)
-
+        # Evaluate Outright Winner (Moneyline)
         ml_eval = evaluate_moneyline_market(pred_p_home, input_h_ml, input_a_ml, min_edge=min_edge_pct)
-        sp_eval = evaluate_spread_market(pred_margin, input_spread, input_sp_odds, 1.91, residual_std=margin_model.residual_std, min_edge=min_edge_pct)
-        tot_eval = evaluate_totals_market(pred_total, input_total, input_tot_odds, input_tot_odds, total_residual_std=totals_model.total_residual_std, min_edge=min_edge_pct)
+        opps = ml_eval["opportunities"]
 
-        all_opps = ml_eval["opportunities"] + sp_eval["opportunities"] + tot_eval["opportunities"]
-
-        st.markdown("#### 💎 Recommended Actionable Bets (Fractional Kelly)")
-        if not all_opps:
-            st.info("No market bets currently satisfy the minimum edge criteria. Model recommends **NO BET**.")
+        st.markdown("### 💡 Recommended Bet")
+        if not opps:
+            st.info(f"🚫 **NO BET RECOMMENDED**: Neither team offers positive EV value (>{min_edge_pct*100:.1f}% edge) against current bookmaker prices. Save your capital for a higher value opportunity.")
         else:
-            rec_rows = []
-            for opp in all_opps:
+            for opp in opps:
                 sizing = size_bet(opp["model_prob"], opp["decimal_odds"], bankroll_val, kelly_multiplier=kelly_mult)
-                team_label = h_name if opp["side"] == "home" else (a_name if opp["side"] == "away" else opp["side"].upper())
-                market_display = "RUN LINE" if (sport=="mlb" and opp["market_type"]=="spread") else opp["market_type"].upper()
-                rec_rows.append({
-                    "Market": market_display,
-                    "Selection": f"{team_label}",
-                    "Offered Odds": f"{opp['decimal_odds']:.2f}",
-                    "Model Prob": f"{opp['model_prob']*100:.1f}%",
-                    "Fair Implied": f"{opp['fair_implied_prob']*100:.1f}%",
-                    "Edge (%)": f"{opp['edge']*100:+.2f}%",
-                    "Expected Value": f"{opp['ev']:+.3f}",
-                    "Kelly %": f"{sizing['stake_pct']:.2f}%",
-                    f"Recommended Stake ({config.DEFAULT_CURRENCY})": f"{config.DEFAULT_CURRENCY}{sizing['stake']:,.2f}"
-                })
-            st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
+                bet_team = h_name if opp["side"] == "home" else a_name
+                stake_amt = sizing["stake"]
+                payout = round(stake_amt * opp["decimal_odds"], 2)
+                profit = round(payout - stake_amt, 2)
+
+                st.markdown(f"""
+                <div style="background-color: #064e3b; border: 2px solid #10b981; border-radius: 12px; padding: 22px; margin-top: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center;">
+                        <h2 style="color: #ecfdf5; margin: 0;">✅ BET ON: <span style="color: #6ee7b7;">{bet_team.upper()} TO WIN</span></h2>
+                        <span style="background-color: #047857; color: white; padding: 6px 14px; border-radius: 20px; font-weight: bold; font-size: 14px;">+{opp['edge']*100:.1f}% VALUE EDGE</span>
+                    </div>
+                    <hr style="border: 0; border-top: 1px solid #047857; margin: 15px 0;">
+                    <div style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 15px; text-align: center;">
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                            <div style="font-size: 13px; color: #a7f3d0;">RECOMMENDED STAKE</div>
+                            <div style="font-size: 26px; font-weight: bold; color: #ffffff;">{config.DEFAULT_CURRENCY}{stake_amt:,.2f}</div>
+                            <div style="font-size: 12px; color: #6ee7b7;">({sizing['stake_pct']:.1f}% of ₱{bankroll_val:,.0f})</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                            <div style="font-size: 13px; color: #a7f3d0;">BOOKMAKER ODDS</div>
+                            <div style="font-size: 26px; font-weight: bold; color: #ffffff;">{opp['decimal_odds']:.2f}</div>
+                            <div style="font-size: 12px; color: #6ee7b7;">Fair: {1.0/opp['model_prob']:.2f}</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                            <div style="font-size: 13px; color: #a7f3d0;">ESTIMATED WIN PROB</div>
+                            <div style="font-size: 26px; font-weight: bold; color: #ffffff;">{opp['model_prob']*100:.1f}%</div>
+                            <div style="font-size: 12px; color: #6ee7b7;">Market Implied: {opp['fair_implied_prob']*100:.1f}%</div>
+                        </div>
+                        <div style="background: rgba(0,0,0,0.2); padding: 12px; border-radius: 8px;">
+                            <div style="font-size: 13px; color: #a7f3d0;">POTENTIAL PROFIT</div>
+                            <div style="font-size: 26px; font-weight: bold; color: #34d399;">+{config.DEFAULT_CURRENCY}{profit:,.2f}</div>
+                            <div style="font-size: 12px; color: #a7f3d0;">Total Return: {config.DEFAULT_CURRENCY}{payout:,.2f}</div>
+                        </div>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
 # ================= TAB 2: ANALYTICS (FOUR FACTORS OR SABERMETRICS) =================
 with tab_analytics:
@@ -328,7 +356,7 @@ with tab_backtest:
     with b_col2:
         bt_compound = st.checkbox("Dynamic Compounding Bankroll", value=False, key=f"bt_compound_{sport}")
     with b_col3:
-        bt_markets = st.multiselect("Active Markets", options=market_options, default=market_options, key=f"bt_markets_{sport}")
+        bt_markets = st.multiselect("Active Markets", options=market_options, default=["moneyline"], key=f"bt_markets_{sport}")
     with b_col4:
         run_btn = st.button("Run Simulation", type="primary", key=f"bt_run_btn_{sport}")
 
