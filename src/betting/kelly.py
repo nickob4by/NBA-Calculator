@@ -44,7 +44,7 @@ def size_bet(
     min_bet_amount: float = config.MIN_BET_AMOUNT
 ) -> Dict:
     """
-    Calculates exact dollar stake and bankroll percentage allocation for a given bet.
+    Calculates exact stake and bankroll percentage allocation for a given bet.
     """
     pct = calculate_kelly_fractional(
         model_prob=model_prob,
@@ -53,19 +53,22 @@ def size_bet(
         max_bankroll_pct=max_bankroll_pct
     )
 
-    stake = round(pct * bankroll, 2)
-    
-    if stake < min_bet_amount or pct <= 0.0:
+    if pct <= 0.0 or bankroll <= 0:
         return {
             "stake": 0.0,
             "stake_pct": 0.0,
             "is_actionable": False,
-            "reason": "Stake below minimum or negative EV"
+            "reason": "Negative or zero EV"
         }
+
+    raw_stake = round(pct * bankroll, 2)
+    # Ensure minimum micro-stake if bankroll is small
+    effective_min = min(min_bet_amount, round(bankroll * max_bankroll_pct, 2))
+    stake = max(raw_stake, effective_min)
 
     return {
         "stake": stake,
-        "stake_pct": round(pct * 100.0, 2),
+        "stake_pct": round((stake / bankroll) * 100.0, 2),
         "is_actionable": True,
-        "reason": f"Allocating {round(pct * 100.0, 2)}% of bankroll ({kelly_multiplier*100:.0f}% Fractional Kelly)"
+        "reason": f"Allocating {round((stake / bankroll) * 100.0, 2)}% of bankroll ({kelly_multiplier*100:.0f}% Fractional Kelly)"
     }
