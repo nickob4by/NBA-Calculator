@@ -1,16 +1,20 @@
-﻿import pandas as pd
+import pandas as pd
 import numpy as np
 import config
 
 STAT_COLUMNS_TO_ROLL = [
-    # Box score core
+    # NBA Box score core
     "pts", "plus_minus", "fg_pct", "fg3_pct", "ft_pct", "ast", "reb", "tov",
-    # Advanced ratings & pace
+    # NBA Advanced ratings & pace
     "possessions", "pace", "off_rating", "def_rating", "net_rating",
-    # Four Factors Offense
+    # NBA Four Factors Offense
     "efg_pct", "tov_pct", "orb_pct", "ftr",
-    # Four Factors Defense
-    "opp_efg_pct", "opp_tov_pct", "opp_orb_pct", "opp_ftr"
+    # NBA Four Factors Defense
+    "opp_efg_pct", "opp_tov_pct", "opp_orb_pct", "opp_ftr",
+    # MLB Box score & sabermetrics
+    "runs", "hits", "hr", "rbi", "bb", "so",
+    "pythag_win_pct", "obp", "slg", "ops", "iso", "woba_proxy",
+    "fip_proxy", "whip", "k_per_9", "bb_per_9"
 ]
 
 def compute_rolling_team_features(df: pd.DataFrame, windows=None) -> pd.DataFrame:

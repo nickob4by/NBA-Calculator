@@ -7,6 +7,7 @@ from src.features.matchup_builder import build_full_feature_dataset, get_feature
 from src.models.margin_model import MarginPredictor
 from src.models.totals_model import TotalsPredictor
 from src.models.win_prob_model import WinProbabilityModel
+from src.models.mlb_models import MLBRunMarginPredictor, MLBTotalsPredictor, MLBWinProbabilityModel
 from src.betting.odds_math import remove_vig, american_to_decimal
 from src.betting.ev_engine import evaluate_moneyline_market, evaluate_spread_market, evaluate_totals_market
 from src.betting.kelly import calculate_kelly_fractional
@@ -16,11 +17,12 @@ logger = logging.getLogger(__name__)
 
 class HistoricalBacktester:
     """
-    Simulates placing +EV wagers chronologically over historical NBA seasons
+    Simulates placing +EV wagers chronologically over historical NBA/MLB seasons
     with dynamic or flat bankroll updates, Fractional Kelly sizing, and CLV tracking.
     """
     def __init__(
         self,
+        sport: str = "nba",
         starting_bankroll: float = config.DEFAULT_STARTING_BANKROLL,
         kelly_fraction: float = config.DEFAULT_KELLY_FRACTION,
         min_edge: float = config.DEFAULT_MIN_EDGE,
@@ -28,6 +30,7 @@ class HistoricalBacktester:
         markets: List[str] = ["moneyline", "spread", "total"],
         compound_bankroll: bool = False
     ):
+        self.sport = sport.lower()
         self.starting_bankroll = starting_bankroll
         self.kelly_fraction = kelly_fraction
         self.min_edge = min_edge
@@ -41,18 +44,23 @@ class HistoricalBacktester:
         end_date: Optional[str] = None,
         season_filter: Optional[str] = None
     ) -> Dict:
-        # 1. Load trained models
-        margin_model = MarginPredictor.load()
-        totals_model = TotalsPredictor.load()
-        win_model = WinProbabilityModel.load()
+        # 1. Load trained models for sport
+        if self.sport == "mlb":
+            margin_model = MLBRunMarginPredictor.load()
+            totals_model = MLBTotalsPredictor.load()
+            win_model = MLBWinProbabilityModel.load()
+        else:
+            margin_model = MarginPredictor.load()
+            totals_model = TotalsPredictor.load()
+            win_model = WinProbabilityModel.load()
 
         # 2. Load games, odds, and build features
-        logs_df = db.fetch_df("SELECT * FROM team_game_logs ORDER BY game_date, game_id")
-        matchups_df = build_full_feature_dataset(logs_df)
+        logs_df = db.fetch_df("SELECT * FROM team_game_logs WHERE sport=? ORDER BY game_date, game_id", (self.sport,))
+        matchups_df = build_full_feature_dataset(logs_df, sport=self.sport)
 
-        odds_df = db.fetch_df("SELECT * FROM odds")
+        odds_df = db.fetch_df("SELECT * FROM odds WHERE sport=?", (self.sport,))
         if odds_df.empty:
-            raise ValueError("No odds records found in database for backtesting.")
+            raise ValueError(f"No odds records found in database for {self.sport.upper()} backtesting.")
 
         odds_df = odds_df.drop_duplicates(subset=["game_id"], keep="first")
 
@@ -94,10 +102,12 @@ class HistoricalBacktester:
         for i, row in merged.iterrows():
             game_id = str(row["game_id"])
             game_date = str(row["game_date"])
-            home_pts = row["home_pts"]
-            away_pts = row["away_pts"]
-            actual_margin = home_pts - away_pts
-            actual_total = home_pts + away_pts
+            
+            # Scores (runs for MLB, pts for NBA)
+            h_score = row.get("home_runs") if (self.sport == "mlb" and pd.notna(row.get("home_runs"))) else row["home_pts"]
+            a_score = row.get("away_runs") if (self.sport == "mlb" and pd.notna(row.get("away_runs"))) else row["away_pts"]
+            actual_margin = h_score - a_score
+            actual_total = h_score + a_score
 
             p_home_win = float(pred_win_probs[i])
             m_margin = float(pred_margins[i])
@@ -118,9 +128,9 @@ class HistoricalBacktester:
                     opp["open_odds"] = float(row.get("home_ml_open", h_ml)) if side == "home" else float(row.get("away_ml_open", a_ml))
                     game_opportunities.append(opp)
 
-            # 2. Spread evaluation
-            if "spread" in self.markets and pd.notna(row.get("spread_line")):
-                spread_line = float(row["spread_line"])
+            # 2. Spread / Run Line evaluation
+            if ("spread" in self.markets or "run_line" in self.markets) and pd.notna(row.get("spread_line")):
+                spread_line = float(row["spread_line"]) # e.g. -1.5 for MLB
                 h_sp_odds = float(row.get("home_spread_odds", 1.91))
                 a_sp_odds = float(row.get("away_spread_odds", 1.91))
                 sp_eval = evaluate_spread_market(m_margin, spread_line, h_sp_odds, a_sp_odds, residual_std=margin_model.residual_std, min_edge=self.min_edge)
@@ -208,6 +218,7 @@ class HistoricalBacktester:
 
                 all_bets.append({
                     "game_id": game_id,
+                    "sport": self.sport,
                     "game_date": game_date,
                     "market_type": bet["market_type"],
                     "side": bet["side"],
@@ -256,6 +267,7 @@ class HistoricalBacktester:
         beat_closing = round(float((bets_df["clv"] >= 0).mean() * 100.0), 1)
 
         return {
+            "sport": self.sport,
             "total_bets": total_bets,
             "wins": wins,
             "losses": losses,

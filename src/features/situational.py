@@ -17,11 +17,12 @@ def haversine_distance(lat1: float, lon1: float, lat2: float, lon2: float) -> fl
 
 def get_arena_coordinates(team_id: int):
     """
-    Returns (lat, lon) for the home arena of team_id.
+    Returns (lat, lon) for the home arena/stadium of team_id across NBA and MLB.
     """
-    team = config.NBA_TEAMS.get(team_id)
-    if team:
-        return team["lat"], team["lon"]
+    if team_id in config.NBA_TEAMS:
+        return config.NBA_TEAMS[team_id]["lat"], config.NBA_TEAMS[team_id]["lon"]
+    elif team_id in config.MLB_TEAMS:
+        return config.MLB_TEAMS[team_id]["lat"], config.MLB_TEAMS[team_id]["lon"]
     return 39.8283, -98.5795 # Default geographic center of US
 
 def compute_situational_features(game_logs_df: pd.DataFrame) -> pd.DataFrame:

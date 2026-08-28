@@ -1,4 +1,5 @@
-import os
+﻿import os
+import sys
 from pathlib import Path
 from dotenv import load_dotenv
 
@@ -19,7 +20,6 @@ DB_PATH = DATA_DIR / "nba_calculator.db"
 
 # API settings
 ODDS_API_KEY = os.getenv("ODDS_API_KEY", "")
-ODDS_API_SPORT = "basketball_nba"
 ODDS_API_REGIONS = "us"
 ODDS_API_MARKETS = "h2h,spreads,totals"
 
@@ -32,12 +32,15 @@ ROLLING_WINDOWS = [5, 10, 20]
 EWMA_SPANS = [5, 10]
 
 # Betting Engine Defaults
-DEFAULT_KELLY_FRACTION = 0.15     # 15% Fractional Kelly (conservative bankroll growth)
-DEFAULT_MIN_EDGE = 0.025          # 2.5% minimum edge over fair implied probability
-DEFAULT_MAX_BANKROLL_PCT = 0.04   # 4.0% maximum allocation on any single game
+DEFAULT_KELLY_FRACTION = 0.15     # 15% Fractional Kelly
+DEFAULT_MIN_EDGE = 0.025          # 2.5% minimum edge
+DEFAULT_MAX_BANKROLL_PCT = 0.04   # 4.0% max risk per bet
 DEFAULT_STARTING_BANKROLL = 10000.0
 
-# 30 NBA Teams Metadata: ID, Name, Arena Coordinates (Lat, Lon) for Haversine travel distance
+# Supported Sports
+SPORTS = ["nba", "mlb"]
+
+# ================= 30 NBA TEAMS =================
 NBA_TEAMS = {
     1610612737: {"abbrev": "ATL", "name": "Atlanta Hawks", "city": "Atlanta", "conf": "East", "div": "Southeast", "lat": 33.7573, "lon": -84.3963, "arena": "State Farm Arena"},
     1610612738: {"abbrev": "BOS", "name": "Boston Celtics", "city": "Boston", "conf": "East", "div": "Atlantic", "lat": 42.3662, "lon": -71.0621, "arena": "TD Garden"},
@@ -71,32 +74,66 @@ NBA_TEAMS = {
     1610612764: {"abbrev": "WAS", "name": "Washington Wizards", "city": "Washington", "conf": "East", "div": "Southeast", "lat": 38.8982, "lon": -77.0209, "arena": "Capital One Arena"}
 }
 
-# Lookup dictionaries
-ABBREV_TO_ID = {v["abbrev"]: k for k, v in NBA_TEAMS.items()}
-NAME_TO_ID = {v["name"].lower(): k for k, v in NBA_TEAMS.items()}
-CITY_TO_ID = {v["city"].lower(): k for k, v in NBA_TEAMS.items()}
+# ================= 30 MLB TEAMS =================
+MLB_TEAMS = {
+    108: {"abbrev": "LAA", "name": "Los Angeles Angels", "city": "Anaheim", "league": "AL", "div": "West", "lat": 33.8003, "lon": -117.8827, "stadium": "Angel Stadium", "park_factor": 1.00},
+    109: {"abbrev": "ARI", "name": "Arizona Diamondbacks", "city": "Phoenix", "league": "NL", "div": "West", "lat": 33.4455, "lon": -112.0667, "stadium": "Chase Field", "park_factor": 1.05},
+    110: {"abbrev": "BAL", "name": "Baltimore Orioles", "city": "Baltimore", "league": "AL", "div": "East", "lat": 39.2839, "lon": -76.6216, "stadium": "Oriole Park at Camden Yards", "park_factor": 0.98},
+    111: {"abbrev": "BOS", "name": "Boston Red Sox", "city": "Boston", "league": "AL", "div": "East", "lat": 42.3467, "lon": -71.0972, "stadium": "Fenway Park", "park_factor": 1.08},
+    112: {"abbrev": "CHC", "name": "Chicago Cubs", "city": "Chicago", "league": "NL", "div": "Central", "lat": 41.9484, "lon": -87.6553, "stadium": "Wrigley Field", "park_factor": 1.03},
+    113: {"abbrev": "CIN", "name": "Cincinnati Reds", "city": "Cincinnati", "league": "NL", "div": "Central", "lat": 39.0979, "lon": -84.5082, "stadium": "Great American Ball Park", "park_factor": 1.12},
+    114: {"abbrev": "CLE", "name": "Cleveland Guardians", "city": "Cleveland", "league": "AL", "div": "Central", "lat": 41.4962, "lon": -81.6852, "stadium": "Progressive Field", "park_factor": 0.97},
+    115: {"abbrev": "COL", "name": "Colorado Rockies", "city": "Denver", "league": "NL", "div": "West", "lat": 39.7559, "lon": -104.9942, "stadium": "Coors Field", "park_factor": 1.25},
+    116: {"abbrev": "DET", "name": "Detroit Tigers", "city": "Detroit", "league": "AL", "div": "Central", "lat": 42.3390, "lon": -83.0485, "stadium": "Comerica Park", "park_factor": 0.96},
+    117: {"abbrev": "HOU", "name": "Houston Astros", "city": "Houston", "league": "AL", "div": "West", "lat": 29.7573, "lon": -95.3555, "stadium": "Daikin Park", "park_factor": 1.02},
+    118: {"abbrev": "KC",  "name": "Kansas City Royals", "city": "Kansas City", "league": "AL", "div": "Central", "lat": 39.0517, "lon": -94.4803, "stadium": "Kauffman Stadium", "park_factor": 1.01},
+    119: {"abbrev": "LAD", "name": "Los Angeles Dodgers", "city": "Los Angeles", "league": "NL", "div": "West", "lat": 34.0739, "lon": -118.2400, "stadium": "Dodger Stadium", "park_factor": 1.02},
+    120: {"abbrev": "WSH", "name": "Washington Nationals", "city": "Washington", "league": "NL", "div": "East", "lat": 38.8730, "lon": -77.0074, "stadium": "Nationals Park", "park_factor": 1.00},
+    121: {"abbrev": "NYM", "name": "New York Mets", "city": "New York", "league": "NL", "div": "East", "lat": 40.7571, "lon": -73.8458, "stadium": "Citi Field", "park_factor": 0.95},
+    133: {"abbrev": "OAK", "name": "Oakland Athletics", "city": "Oakland", "league": "AL", "div": "West", "lat": 37.7516, "lon": -122.2005, "stadium": "Sutter Health Park", "park_factor": 0.96},
+    134: {"abbrev": "PIT", "name": "Pittsburgh Pirates", "city": "Pittsburgh", "league": "NL", "div": "Central", "lat": 40.4469, "lon": -80.0057, "stadium": "PNC Park", "park_factor": 0.98},
+    135: {"abbrev": "SD",  "name": "San Diego Padres", "city": "San Diego", "league": "NL", "div": "West", "lat": 32.7076, "lon": -117.1570, "stadium": "Petco Park", "park_factor": 0.96},
+    136: {"abbrev": "SEA", "name": "Seattle Mariners", "city": "Seattle", "league": "AL", "div": "West", "lat": 47.5914, "lon": -122.3325, "stadium": "T-Mobile Park", "park_factor": 0.92},
+    137: {"abbrev": "SF",  "name": "San Francisco Giants", "city": "San Francisco", "league": "NL", "div": "West", "lat": 37.7786, "lon": -122.3893, "stadium": "Oracle Park", "park_factor": 0.93},
+    138: {"abbrev": "STL", "name": "St. Louis Cardinals", "city": "St. Louis", "league": "NL", "div": "Central", "lat": 38.6226, "lon": -90.1928, "stadium": "Busch Stadium", "park_factor": 0.97},
+    139: {"abbrev": "TB",  "name": "Tampa Bay Rays", "city": "St. Petersburg", "league": "AL", "div": "East", "lat": 27.7682, "lon": -82.6534, "stadium": "Tropicana Field", "park_factor": 0.96},
+    140: {"abbrev": "TEX", "name": "Texas Rangers", "city": "Arlington", "league": "AL", "div": "West", "lat": 32.7473, "lon": -97.0845, "stadium": "Globe Life Field", "park_factor": 1.01},
+    141: {"abbrev": "TOR", "name": "Toronto Blue Jays", "city": "Toronto", "league": "AL", "div": "East", "lat": 43.6414, "lon": -79.3894, "stadium": "Rogers Centre", "park_factor": 1.02},
+    142: {"abbrev": "MIN", "name": "Minnesota Twins", "city": "Minneapolis", "league": "AL", "div": "Central", "lat": 44.9817, "lon": -93.2778, "stadium": "Target Field", "park_factor": 0.99},
+    143: {"abbrev": "PHI", "name": "Philadelphia Phillies", "city": "Philadelphia", "league": "NL", "div": "East", "lat": 39.9061, "lon": -75.1665, "stadium": "Citizens Bank Park", "park_factor": 1.06},
+    144: {"abbrev": "ATL", "name": "Atlanta Braves", "city": "Atlanta", "league": "NL", "div": "East", "lat": 33.8908, "lon": -84.4678, "stadium": "Truist Park", "park_factor": 1.04},
+    145: {"abbrev": "CWS", "name": "Chicago White Sox", "city": "Chicago", "league": "AL", "div": "Central", "lat": 41.8300, "lon": -87.6339, "stadium": "Guaranteed Rate Field", "park_factor": 1.03},
+    146: {"abbrev": "MIA", "name": "Miami Marlins", "city": "Miami", "league": "NL", "div": "East", "lat": 25.7783, "lon": -80.2196, "stadium": "loanDepot park", "park_factor": 0.94},
+    147: {"abbrev": "NYY", "name": "New York Yankees", "city": "New York", "league": "AL", "div": "East", "lat": 40.8296, "lon": -73.9262, "stadium": "Yankee Stadium", "park_factor": 1.04},
+    158: {"abbrev": "MIL", "name": "Milwaukee Brewers", "city": "Milwaukee", "league": "NL", "div": "Central", "lat": 43.0280, "lon": -87.9712, "stadium": "American Family Field", "park_factor": 1.03}
+}
 
-# Helper functions
-def get_team_id(identifier):
-    if isinstance(identifier, int) and identifier in NBA_TEAMS:
+def get_teams_for_sport(sport: str = "nba"):
+    return MLB_TEAMS if sport.lower() == "mlb" else NBA_TEAMS
+
+def get_team_id(identifier, sport: str = "nba"):
+    teams_dict = get_teams_for_sport(sport)
+    if isinstance(identifier, int) and identifier in teams_dict:
         return identifier
     if isinstance(identifier, str):
         ident = identifier.strip().upper()
-        if ident in ABBREV_TO_ID:
-            return ABBREV_TO_ID[ident]
+        for k, v in teams_dict.items():
+            if v["abbrev"].upper() == ident:
+                return k
         ident_lower = identifier.strip().lower()
-        if ident_lower in NAME_TO_ID:
-            return NAME_TO_ID[ident_lower]
-        if ident_lower in CITY_TO_ID:
-            return CITY_TO_ID[ident_lower]
+        for k, v in teams_dict.items():
+            if v["name"].lower() == ident_lower or v["city"].lower() == ident_lower:
+                return k
     return None
 
-def get_team_abbrev(team_id):
-    if team_id in NBA_TEAMS:
-        return NBA_TEAMS[team_id]["abbrev"]
+def get_team_abbrev(team_id, sport: str = "nba"):
+    teams_dict = get_teams_for_sport(sport)
+    if team_id in teams_dict:
+        return teams_dict[team_id]["abbrev"]
     return str(team_id)
 
-def get_team_name(team_id):
-    if team_id in NBA_TEAMS:
-        return NBA_TEAMS[team_id]["name"]
+def get_team_name(team_id, sport: str = "nba"):
+    teams_dict = get_teams_for_sport(sport)
+    if team_id in teams_dict:
+        return teams_dict[team_id]["name"]
     return f"Team {team_id}"

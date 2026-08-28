@@ -1,4 +1,4 @@
-import sys
+﻿import sys
 from pathlib import Path
 
 # Add project root to sys.path
@@ -19,15 +19,17 @@ from src.features.matchup_builder import build_full_feature_dataset, get_feature
 from src.models.margin_model import MarginPredictor
 from src.models.totals_model import TotalsPredictor
 from src.models.win_prob_model import WinProbabilityModel
+from src.models.mlb_models import MLBRunMarginPredictor, MLBTotalsPredictor, MLBWinProbabilityModel
 from src.betting.odds_math import american_to_decimal, decimal_to_american, remove_vig
 from src.betting.ev_engine import evaluate_moneyline_market, evaluate_spread_market, evaluate_totals_market
 from src.betting.kelly import size_bet, calculate_kelly_fractional
 from src.betting.backtester import HistoricalBacktester
 from src.ingestion.pipeline import generate_seed_dataset_if_empty, sync_season
+from src.ingestion.mlb_api_fetcher import generate_mlb_seed_dataset_if_empty
 
 st.set_page_config(
-    page_title="NBA Calculator — Predictive Analytics & +EV Sizing",
-    page_icon="🏀",
+    page_title="Multi-Sport Quantitative Calculator (NBA & MLB)",
+    page_icon="🏆",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -42,40 +44,46 @@ st.markdown("""
         border: 1px solid #2d3748;
         box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
     }
-    .badge-win {
-        background-color: #10b981;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    .badge-loss {
-        background-color: #ef4444;
-        color: white;
-        padding: 3px 8px;
-        border-radius: 4px;
-        font-weight: bold;
-    }
-    .badge-ev {
-        background-color: #3b82f6;
-        color: white;
-        padding: 4px 10px;
-        border-radius: 6px;
+    .stSelectbox label {
         font-weight: bold;
     }
 </style>
 """, unsafe_allow_html=True)
 
+# Sidebar: Sport Selector
+st.sidebar.title("🏆 Sportsbook Analytics")
+sport_choice = st.sidebar.selectbox(
+    "Choose Sport",
+    options=["🏀 NBA (Basketball)", "⚾ MLB (Baseball)"],
+    index=0
+)
+sport = "mlb" if "MLB" in sport_choice else "nba"
+sport_label = "MLB (Baseball)" if sport == "mlb" else "NBA (Basketball)"
+
+st.sidebar.markdown("---")
+st.sidebar.subheader("💰 Bankroll & Risk Settings")
+bankroll_val = st.sidebar.number_input("Your Bankroll ($)", min_value=100.0, max_value=1000000.0, value=10000.0, step=500.0)
+kelly_mult = st.sidebar.slider("Fractional Kelly Multiplier", min_value=0.05, max_value=0.50, value=0.15, step=0.01, help="0.15 = 15% Fractional Kelly")
+min_edge_pct = st.sidebar.slider("Min Edge Threshold (%)", min_value=0.5, max_value=10.0, value=2.5, step=0.5) / 100.0
+
 @st.cache_resource
-def load_models_and_data():
-    generate_seed_dataset_if_empty()
-    margin_model = MarginPredictor.load()
-    totals_model = TotalsPredictor.load()
-    win_model = WinProbabilityModel.load()
-    logs_df = db.fetch_df("SELECT * FROM team_game_logs ORDER BY game_date, game_id")
-    matchups_df = build_full_feature_dataset(logs_df)
+def load_sport_models_and_data(target_sport: str):
+    if target_sport == "mlb":
+        generate_mlb_seed_dataset_if_empty()
+        margin_model = MLBRunMarginPredictor.load()
+        totals_model = MLBTotalsPredictor.load()
+        win_model = MLBWinProbabilityModel.load()
+        metrics_path = config.MODELS_DIR / "mlb_model_metrics.json"
+    else:
+        generate_seed_dataset_if_empty()
+        margin_model = MarginPredictor.load()
+        totals_model = TotalsPredictor.load()
+        win_model = WinProbabilityModel.load()
+        metrics_path = config.MODELS_DIR / "model_metrics.json"
+
+    logs_df = db.fetch_df("SELECT * FROM team_game_logs WHERE sport=? ORDER BY game_date, game_id", (target_sport,))
+    matchups_df = build_full_feature_dataset(logs_df, sport=target_sport)
     
-    metrics_path = config.MODELS_DIR / "model_metrics.json"
     metrics = {}
     if metrics_path.exists():
         with open(metrics_path, "r", encoding="utf-8") as f:
@@ -83,19 +91,16 @@ def load_models_and_data():
             
     return margin_model, totals_model, win_model, matchups_df, metrics
 
-margin_model, totals_model, win_model, matchups_df, model_metrics = load_models_and_data()
+margin_model, totals_model, win_model, matchups_df, model_metrics = load_sport_models_and_data(sport)
 
-# Sidebar
-st.sidebar.title("🏀 NBA Calculator")
-st.sidebar.caption("Quantitative Betting Engine & Analytics")
+# Navigation Tabs
+score_unit = "Runs" if sport == "mlb" else "Points"
+spread_title = "Run Line (±1.5)" if sport == "mlb" else "Point Spread"
+adv_tab_title = "⚾ Sabermetrics Explorer" if sport == "mlb" else "🏀 Four Factors Explorer"
 
-bankroll_val = st.sidebar.number_input("Your Bankroll ($)", min_value=100.0, max_value=1000000.0, value=10000.0, step=500.0)
-kelly_mult = st.sidebar.slider("Fractional Kelly Multiplier", min_value=0.05, max_value=0.50, value=0.15, step=0.01, help="0.15 = 15% Fractional Kelly")
-min_edge_pct = st.sidebar.slider("Min Edge Threshold (%)", min_value=0.5, max_value=10.0, value=2.5, step=0.5) / 100.0
-
-tab_predict, tab_four_factors, tab_backtest, tab_diagnostics, tab_data = st.tabs([
-    "🎯 Matchup Forecast & +EV Sizer",
-    "📊 Four Factors Explorer",
+tab_predict, tab_analytics, tab_backtest, tab_diagnostics, tab_data = st.tabs([
+    f"🎯 {sport.upper()} Matchup & +EV Sizer",
+    adv_tab_title,
     "📈 Historical Backtest",
     "🔬 Calibration & Model Lab",
     "⚙️ Data & Settings"
@@ -103,27 +108,27 @@ tab_predict, tab_four_factors, tab_backtest, tab_diagnostics, tab_data = st.tabs
 
 # ================= TAB 1: PREDICTION & +EV SIZER =================
 with tab_predict:
-    st.subheader("Matchup Prediction & Positive EV (+EV) Discovery")
+    st.subheader(f"{sport_label} — Matchup Prediction & Positive EV (+EV) Discovery")
     
     col_h, col_a = st.columns(2)
-    
-    team_list = list(config.NBA_TEAMS.keys())
-    team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in config.NBA_TEAMS.items()}
+    teams_dict = config.get_teams_for_sport(sport)
+    team_list = list(teams_dict.keys())
+    team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in teams_dict.items()}
+
+    default_home_idx = 28 if sport == "mlb" else 1 # NYY for MLB, BOS for NBA
+    default_away_idx = 3 if sport == "mlb" else 13  # BOS for MLB, LAL for NBA
 
     with col_h:
-        home_team_id = st.selectbox("Select Home Team", options=team_list, format_func=lambda x: team_options[x], index=1)
+        home_team_id = st.selectbox(f"Select Home Team ({sport.upper()})", options=team_list, format_func=lambda x: team_options[x], index=min(default_home_idx, len(team_list)-1))
     with col_a:
-        # Default to another team (e.g. LAL)
-        away_team_id = st.selectbox("Select Away Team", options=team_list, format_func=lambda x: team_options[x], index=13)
+        away_team_id = st.selectbox(f"Select Away Team ({sport.upper()})", options=team_list, format_func=lambda x: team_options[x], index=min(default_away_idx, len(team_list)-1))
 
     if home_team_id == away_team_id:
         st.warning("Please select two distinct teams for the matchup.")
     else:
-        # Extract features
         recent_home = matchups_df[matchups_df["home_team_id"] == home_team_id].iloc[-1:]
-        recent_away = matchups_df[matchups_df["away_team_id"] == away_team_id].iloc[-1:]
-
         eval_row = recent_home.copy() if not recent_home.empty else matchups_df.iloc[-1:].copy()
+        
         feature_cols = get_feature_columns(eval_row)
         X = eval_row[feature_cols]
 
@@ -132,43 +137,40 @@ with tab_predict:
         pred_p_home = float(win_model.predict_proba(predicted_margins=np.array([pred_margin]), sigma=margin_model.residual_std)[0])
         pred_p_away = 1.0 - pred_p_home
 
-        h_name = config.get_team_name(home_team_id)
-        a_name = config.get_team_name(away_team_id)
+        h_name = config.get_team_name(home_team_id, sport=sport)
+        a_name = config.get_team_name(away_team_id, sport=sport)
 
-        # Forecast Metrics Display
         st.markdown("---")
         m1, m2, m3, m4 = st.columns(4)
         m1.metric(f"🏠 {h_name} Win Prob", f"{pred_p_home*100:.1f}%", f"Fair: {1.0/pred_p_home:.2f}")
         m2.metric(f"✈️ {a_name} Win Prob", f"{pred_p_away*100:.1f}%", f"Fair: {1.0/pred_p_away:.2f}")
-        m3.metric("Projected Point Margin", f"{pred_margin:+.1f} pts", f"{h_name if pred_margin > 0 else a_name} favored")
-        m4.metric("Projected Total Points", f"{pred_total:.1f} pts", "Combined Score")
+        m3.metric(f"Projected {score_unit} Margin", f"{pred_margin:+.2f} {score_unit.lower()}", f"{h_name if pred_margin > 0 else a_name} favored")
+        m4.metric(f"Projected Total {score_unit}", f"{pred_total:.2f} {score_unit.lower()}", "Combined Score")
 
-        # Market Odds Inputs
         st.markdown("### 🎲 Sportsbook Lines & Expected Value Engine")
         c_ml, c_sp, c_tot = st.columns(3)
 
         with c_ml:
-            st.markdown("**Moneyline (Decimal / American)**")
+            st.markdown("**Moneyline (Decimal Odds)**")
             def_h_ml = round(1.0 / (pred_p_home * 1.025), 2)
             def_a_ml = round(1.0 / (pred_p_away * 1.025), 2)
-            input_h_ml = st.number_input(f"{config.get_team_abbrev(home_team_id)} Odds", value=float(def_h_ml), step=0.05)
-            input_a_ml = st.number_input(f"{config.get_team_abbrev(away_team_id)} Odds", value=float(def_a_ml), step=0.05)
+            input_h_ml = st.number_input(f"{config.get_team_abbrev(home_team_id, sport=sport)} Odds", value=float(def_h_ml), step=0.05)
+            input_a_ml = st.number_input(f"{config.get_team_abbrev(away_team_id, sport=sport)} Odds", value=float(def_a_ml), step=0.05)
 
         with c_sp:
-            st.markdown("**Point Spread**")
-            def_spread = round(-pred_margin * 2.0) / 2.0
-            input_spread = st.number_input(f"Home Spread Line", value=float(def_spread), step=0.5)
-            input_sp_odds = st.number_input("Spread Price (e.g. 1.91)", value=1.91, step=0.01)
+            st.markdown(f"**{spread_title}**")
+            def_spread = -1.5 if sport == "mlb" else (round(-pred_margin * 2.0) / 2.0)
+            input_spread = st.number_input("Home Line", value=float(def_spread), step=0.5)
+            input_sp_odds = st.number_input("Home Price (e.g. 2.10 or 1.91)", value=2.10 if sport=="mlb" else 1.91, step=0.01)
 
         with c_tot:
-            st.markdown("**Over / Under Total**")
-            def_tot_line = round(pred_total * 2.0) / 2.0
+            st.markdown(f"**Over / Under {score_unit}**")
+            def_tot_line = 8.5 if sport == "mlb" else (round(pred_total * 2.0) / 2.0)
             input_total = st.number_input("Total Line", value=float(def_tot_line), step=0.5)
             input_tot_odds = st.number_input("Totals Price (e.g. 1.91)", value=1.91, step=0.01)
 
-        # Compute EV & Sizing
         ml_eval = evaluate_moneyline_market(pred_p_home, input_h_ml, input_a_ml, min_edge=min_edge_pct)
-        sp_eval = evaluate_spread_market(pred_margin, input_spread, input_sp_odds, input_sp_odds, residual_std=margin_model.residual_std, min_edge=min_edge_pct)
+        sp_eval = evaluate_spread_market(pred_margin, input_spread, input_sp_odds, 1.91, residual_std=margin_model.residual_std, min_edge=min_edge_pct)
         tot_eval = evaluate_totals_market(pred_total, input_total, input_tot_odds, input_tot_odds, total_residual_std=totals_model.total_residual_std, min_edge=min_edge_pct)
 
         all_opps = ml_eval["opportunities"] + sp_eval["opportunities"] + tot_eval["opportunities"]
@@ -181,8 +183,9 @@ with tab_predict:
             for opp in all_opps:
                 sizing = size_bet(opp["model_prob"], opp["decimal_odds"], bankroll_val, kelly_multiplier=kelly_mult)
                 team_label = h_name if opp["side"] == "home" else (a_name if opp["side"] == "away" else opp["side"].upper())
+                market_display = "RUN LINE" if (sport=="mlb" and opp["market_type"]=="spread") else opp["market_type"].upper()
                 rec_rows.append({
-                    "Market": opp["market_type"].upper(),
+                    "Market": market_display,
                     "Selection": f"{team_label}",
                     "Offered Odds": f"{opp['decimal_odds']:.2f}",
                     "Model Prob": f"{opp['model_prob']*100:.1f}%",
@@ -194,68 +197,104 @@ with tab_predict:
                 })
             st.dataframe(pd.DataFrame(rec_rows), use_container_width=True)
 
-# ================= TAB 2: FOUR FACTORS EXPLORER =================
-with tab_four_factors:
-    st.subheader("Dean Oliver's Four Factors & Head-to-Head Comparison")
-    
-    col1, col2 = st.columns(2)
-    with col1:
-        team_a_sel = st.selectbox("Team 1", options=team_list, format_func=lambda x: team_options[x], index=1, key="ff_t1")
-    with col2:
-        team_b_sel = st.selectbox("Team 2", options=team_list, format_func=lambda x: team_options[x], index=13, key="ff_t2")
+# ================= TAB 2: ANALYTICS (FOUR FACTORS OR SABERMETRICS) =================
+with tab_analytics:
+    if sport == "mlb":
+        st.subheader("⚾ Baseball Sabermetrics & Pythagorean Expectation")
+        col1, col2 = st.columns(2)
+        with col1:
+            t1_sel = st.selectbox("Team 1", options=team_list, format_func=lambda x: team_options[x], index=default_home_idx, key="mlb_t1")
+        with col2:
+            t2_sel = st.selectbox("Team 2", options=team_list, format_func=lambda x: team_options[x], index=default_away_idx, key="mlb_t2")
 
-    # Fetch team recent stats
-    t1_logs = matchups_df[matchups_df["home_team_id"] == team_a_sel].iloc[-1:]
-    t2_logs = matchups_df[matchups_df["home_team_id"] == team_b_sel].iloc[-1:]
+        t1_logs = matchups_df[matchups_df["home_team_id"] == t1_sel].iloc[-1:]
+        t2_logs = matchups_df[matchups_df["home_team_id"] == t2_sel].iloc[-1:]
 
-    if not t1_logs.empty and not t2_logs.empty:
-        t1_row = t1_logs.iloc[0]
-        t2_row = t2_logs.iloc[0]
+        if not t1_logs.empty and not t2_logs.empty:
+            t1_r = t1_logs.iloc[0]
+            t2_r = t2_logs.iloc[0]
 
-        # Radar Chart of Four Factors
-        categories = ["eFG% (Shooting)", "TOV% (Care)", "OREB% (Glass)", "FTR (Free Throws)", "Net Rating"]
-        
-        # Normalized values for radar
-        t1_vals = [
-            float(t1_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
-            (1.0 - float(t1_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
-            float(t1_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
-            float(t1_row.get("home_roll_ftr_w10", 0.22)) * 100,
-            float(t1_row.get("home_roll_net_rating_w10", 3.0)) + 50
-        ]
+            categories = ["Pythagorean Win %", "OPS (x100)", "wOBA (x100)", "Run Prevention (FIP Inv)", "WHIP Inv"]
+            
+            t1_vals = [
+                float(t1_r.get("home_roll_pythag_win_pct_w10", 0.50)) * 100,
+                float(t1_r.get("home_roll_ops_w10", 0.75)) * 100,
+                float(t1_r.get("home_roll_woba_proxy_w10", 0.32)) * 200,
+                (10.0 - float(t1_r.get("home_roll_fip_proxy_w10", 4.0))) * 10,
+                (3.0 - float(t1_r.get("home_roll_whip_w10", 1.30))) * 40
+            ]
+            t2_vals = [
+                float(t2_r.get("home_roll_pythag_win_pct_w10", 0.50)) * 100,
+                float(t2_r.get("home_roll_ops_w10", 0.75)) * 100,
+                float(t2_r.get("home_roll_woba_proxy_w10", 0.32)) * 200,
+                (10.0 - float(t2_r.get("home_roll_fip_proxy_w10", 4.0))) * 10,
+                (3.0 - float(t2_r.get("home_roll_whip_w10", 1.30))) * 40
+            ]
 
-        t2_vals = [
-            float(t2_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
-            (1.0 - float(t2_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
-            float(t2_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
-            float(t2_row.get("home_roll_ftr_w10", 0.22)) * 100,
-            float(t2_row.get("home_roll_net_rating_w10", 3.0)) + 50
-        ]
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(r=t1_vals, theta=categories, fill='toself', name=config.get_team_name(t1_sel, sport="mlb")))
+            fig.add_trace(go.Scatterpolar(r=t2_vals, theta=categories, fill='toself', name=config.get_team_name(t2_sel, sport="mlb")))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="MLB Sabermetric Radar Comparison (10-Game Lagged Form)")
+            st.plotly_chart(fig, use_container_width=True)
 
-        fig = go.Figure()
-        fig.add_trace(go.Scatterpolar(r=t1_vals, theta=categories, fill='toself', name=config.get_team_name(team_a_sel)))
-        fig.add_trace(go.Scatterpolar(r=t2_vals, theta=categories, fill='toself', name=config.get_team_name(team_b_sel)))
-        fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="Four Factors Radar Comparison (10-Game Form)")
-        
-        st.plotly_chart(fig, use_container_width=True)
+    else:
+        st.subheader("🏀 Dean Oliver's Four Factors & Head-to-Head Comparison")
+        col1, col2 = st.columns(2)
+        with col1:
+            t1_sel = st.selectbox("Team 1", options=team_list, format_func=lambda x: team_options[x], index=default_home_idx, key="nba_t1")
+        with col2:
+            t2_sel = st.selectbox("Team 2", options=team_list, format_func=lambda x: team_options[x], index=default_away_idx, key="nba_t2")
+
+        t1_logs = matchups_df[matchups_df["home_team_id"] == t1_sel].iloc[-1:]
+        t2_logs = matchups_df[matchups_df["home_team_id"] == t2_sel].iloc[-1:]
+
+        if not t1_logs.empty and not t2_logs.empty:
+            t1_row = t1_logs.iloc[0]
+            t2_row = t2_logs.iloc[0]
+
+            categories = ["eFG% (Shooting)", "TOV% (Care)", "OREB% (Glass)", "FTR (Free Throws)", "Net Rating"]
+            t1_vals = [
+                float(t1_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
+                (1.0 - float(t1_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
+                float(t1_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
+                float(t1_row.get("home_roll_ftr_w10", 0.22)) * 100,
+                float(t1_row.get("home_roll_net_rating_w10", 3.0)) + 50
+            ]
+            t2_vals = [
+                float(t2_row.get("home_roll_efg_pct_w10", 0.52)) * 100,
+                (1.0 - float(t2_row.get("home_roll_tov_pct_w10", 0.13))) * 100,
+                float(t2_row.get("home_roll_orb_pct_w10", 0.25)) * 100,
+                float(t2_row.get("home_roll_ftr_w10", 0.22)) * 100,
+                float(t2_row.get("home_roll_net_rating_w10", 3.0)) + 50
+            ]
+
+            fig = go.Figure()
+            fig.add_trace(go.Scatterpolar(r=t1_vals, theta=categories, fill='toself', name=config.get_team_name(t1_sel, sport="nba")))
+            fig.add_trace(go.Scatterpolar(r=t2_vals, theta=categories, fill='toself', name=config.get_team_name(t2_sel, sport="nba")))
+            fig.update_layout(polar=dict(radialaxis=dict(visible=True, range=[0, 100])), showlegend=True, title="NBA Four Factors Radar Comparison (10-Game Form)")
+            st.plotly_chart(fig, use_container_width=True)
 
 # ================= TAB 3: HISTORICAL BACKTEST =================
 with tab_backtest:
-    st.subheader("Historical Simulation & Performance Metrics")
+    st.subheader(f"📈 {sport.upper()} Historical Simulation & Performance Metrics")
     
+    season_options = ["All Seasons", "2024", "2023", "2022"] if sport == "mlb" else ["All Seasons", "2024-25", "2023-24", "2022-23"]
+    market_options = ["moneyline", "spread", "total"]
+
     b_col1, b_col2, b_col3, b_col4 = st.columns(4)
     with b_col1:
-        bt_season = st.selectbox("Season Filter", options=["All Seasons", "2024-25", "2023-24", "2022-23"], index=1)
+        bt_season = st.selectbox("Season Filter", options=season_options, index=1)
     with b_col2:
         bt_compound = st.checkbox("Dynamic Compounding Bankroll", value=False)
     with b_col3:
-        bt_markets = st.multiselect("Active Markets", options=["moneyline", "spread", "total"], default=["moneyline", "spread", "total"])
+        bt_markets = st.multiselect("Active Markets", options=market_options, default=market_options)
     with b_col4:
         run_btn = st.button("Run Simulation", type="primary")
 
     season_arg = None if bt_season == "All Seasons" else bt_season
 
     bt = HistoricalBacktester(
+        sport=sport,
         starting_bankroll=bankroll_val,
         kelly_fraction=kelly_mult,
         min_edge=min_edge_pct,
@@ -263,10 +302,9 @@ with tab_backtest:
         markets=bt_markets
     )
     
-    with st.spinner("Simulating historical wagers chronologically..."):
+    with st.spinner(f"Simulating {sport.upper()} historical wagers chronologically..."):
         res = bt.run_backtest(season_filter=season_arg)
 
-    # Metrics row
     r1, r2, r3, r4, r5, r6 = st.columns(6)
     r1.metric("Total Wagers", f"{res['total_bets']:,}")
     r2.metric("Win Rate", f"{res['win_rate']}%", f"{res['wins']}W - {res['losses']}L")
@@ -275,42 +313,39 @@ with tab_backtest:
     r5.metric("Max Drawdown", f"{res['max_drawdown_pct']:.2f}%", f"${res['max_drawdown_dollars']:,.2f}")
     r6.metric("Beat Closing Line", f"{res['beat_closing_pct']}%", f"Avg CLV: {res['avg_clv_pct']:+.2f}%")
 
-    # Equity Curve Plotly Chart
     if res["equity_curve"]:
         eq_df = pd.DataFrame(res["equity_curve"])
         fig_equity = px.line(
             eq_df, x="game_date", y="bankroll",
-            title="Portfolio Equity Trajectory ($)",
+            title=f"{sport.upper()} Portfolio Equity Trajectory ($)",
             labels={"game_date": "Date", "bankroll": "Bankroll ($)"}
         )
         fig_equity.update_traces(line=dict(color="#10b981", width=2.5))
         st.plotly_chart(fig_equity, use_container_width=True)
 
-    # Bets Table
     if res["bets"]:
-        st.markdown("#### Chronological Bet Log")
+        st.markdown(f"#### {sport.upper()} Chronological Bet Log")
         st.dataframe(pd.DataFrame(res["bets"]).tail(100), use_container_width=True)
 
 # ================= TAB 4: CALIBRATION & MODEL LAB =================
 with tab_diagnostics:
-    st.subheader("Probability Calibration & Model Diagnostics")
+    st.subheader(f"🔬 {sport.upper()} Probability Calibration & Model Diagnostics")
     
     if model_metrics:
         d1, d2, d3, d4 = st.columns(4)
         d1.metric("Log Loss", str(model_metrics.get("win_probability_metrics", {}).get("log_loss", "N/A")))
         d2.metric("Brier Score", str(model_metrics.get("win_probability_metrics", {}).get("brier_score", "N/A")))
         d3.metric("Accuracy", f"{model_metrics.get('win_probability_metrics', {}).get('accuracy', 0)*100:.1f}%")
-        d4.metric("Margin MAE", f"{model_metrics.get('margin_metrics', {}).get('mae', 'N/A')} pts")
+        d4.metric(f"Margin MAE", f"{model_metrics.get('margin_metrics', {}).get('mae', 'N/A')} {score_unit.lower()}")
 
-        # Reliability Diagram
         rel_bins = model_metrics.get("win_probability_metrics", {}).get("reliability_bins", [])
         if rel_bins:
             b_df = pd.DataFrame(rel_bins)
             fig_rel = go.Figure()
             fig_rel.add_trace(go.Scatter(x=[0, 1], y=[0, 1], mode="lines", name="Perfect Calibration", line=dict(dash="dash", color="gray")))
-            fig_rel.add_trace(go.Scatter(x=b_df["confidence"], y=b_df["accuracy"], mode="lines+markers", name="Model Calibration", line=dict(color="#3b82f6", width=3)))
+            fig_rel.add_trace(go.Scatter(x=b_df["confidence"], y=b_df["accuracy"], mode="lines+markers", name=f"{sport.upper()} Model Calibration", line=dict(color="#3b82f6", width=3)))
             fig_rel.update_layout(
-                title="Reliability Diagram (Predicted Probability vs True Win Rate)",
+                title=f"{sport.upper()} Reliability Diagram (Predicted Probability vs True Win Rate)",
                 xaxis_title="Forecast Confidence (Predicted Probability)",
                 yaxis_title="Empirical Win Frequency",
                 xaxis=dict(range=[0, 1]),
@@ -320,23 +355,30 @@ with tab_diagnostics:
 
 # ================= TAB 5: DATA & SETTINGS =================
 with tab_data:
-    st.subheader("Database & Ingestion Settings")
-    games_cnt = db.fetch_one("SELECT COUNT(*) as c FROM games")["c"]
+    st.subheader("⚙️ Multi-Sport Database & Ingestion Settings")
+    nba_cnt = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='nba'")["c"]
+    mlb_cnt = db.fetch_one("SELECT COUNT(*) as c FROM games WHERE sport='mlb'")["c"]
     logs_cnt = db.fetch_one("SELECT COUNT(*) as c FROM team_game_logs")["c"]
     odds_cnt = db.fetch_one("SELECT COUNT(*) as c FROM odds")["c"]
 
     col_s1, col_s2 = st.columns(2)
     with col_s1:
-        st.markdown("### 📦 SQLite Status")
-        st.write(f"- **Games Table**: {games_cnt:,} records")
+        st.markdown("### 📦 SQLite Multi-Sport Status")
+        st.write(f"- **🏀 NBA Games**: {nba_cnt:,} records")
+        st.write(f"- **⚾ MLB Games**: {mlb_cnt:,} records")
         st.write(f"- **Team Logs Table**: {logs_cnt:,} records")
         st.write(f"- **Odds Table**: {odds_cnt:,} records")
         st.write(f"- **Database Path**: `{config.DB_PATH}`")
 
     with col_s2:
         st.markdown("### 🔄 Sync Seasons")
-        sync_season_input = st.text_input("Season to sync (e.g. 2024-25)", value="2024-25")
+        sync_sport = st.selectbox("Sport to Sync", options=["NBA", "MLB"], index=0 if sport=="nba" else 1)
+        sync_season_input = st.text_input("Season to sync", value="2024" if sync_sport=="MLB" else "2024-25")
         if st.button("Trigger Sync"):
             with st.spinner("Syncing..."):
-                cnt = sync_season(sync_season_input)
-                st.success(f"Synced {cnt} games!")
+                if sync_sport == "MLB":
+                    generate_mlb_seed_dataset_if_empty()
+                    st.success("MLB data synchronized!")
+                else:
+                    cnt = sync_season(sync_season_input)
+                    st.success(f"Synced {cnt} NBA games!")

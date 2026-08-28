@@ -1,4 +1,4 @@
-import sqlite3
+﻿import sqlite3
 import pandas as pd
 from pathlib import Path
 from contextlib import contextmanager
@@ -31,7 +31,48 @@ class Database:
         with open(SCHEMA_FILE, "r", encoding="utf-8") as f:
             schema_sql = f.read()
         with self.get_connection() as conn:
+            self._migrate(conn)
             conn.executescript(schema_sql)
+
+    def _migrate(self, conn):
+        """Ensures any new multi-sport columns are added if tables already existed."""
+        tables_to_migrate = [
+            ("games", "sport", "TEXT DEFAULT 'nba'"),
+            ("team_game_logs", "sport", "TEXT DEFAULT 'nba'"),
+            ("team_game_logs", "runs", "INTEGER"),
+            ("team_game_logs", "hits", "INTEGER"),
+            ("team_game_logs", "errors", "INTEGER"),
+            ("team_game_logs", "hr", "INTEGER"),
+            ("team_game_logs", "rbi", "INTEGER"),
+            ("team_game_logs", "bb", "INTEGER"),
+            ("team_game_logs", "so", "INTEGER"),
+            ("team_game_logs", "lob", "INTEGER"),
+            ("team_game_logs", "ip", "REAL"),
+            ("team_game_logs", "er", "INTEGER"),
+            ("team_advanced_stats", "sport", "TEXT DEFAULT 'nba'"),
+            ("team_advanced_stats", "pythag_win_pct", "REAL"),
+            ("team_advanced_stats", "obp", "REAL"),
+            ("team_advanced_stats", "slg", "REAL"),
+            ("team_advanced_stats", "ops", "REAL"),
+            ("team_advanced_stats", "iso", "REAL"),
+            ("team_advanced_stats", "woba_proxy", "REAL"),
+            ("team_advanced_stats", "fip_proxy", "REAL"),
+            ("team_advanced_stats", "whip", "REAL"),
+            ("team_advanced_stats", "k_per_9", "REAL"),
+            ("team_advanced_stats", "bb_per_9", "REAL"),
+            ("odds", "sport", "TEXT DEFAULT 'nba'"),
+            ("predictions", "sport", "TEXT DEFAULT 'nba'"),
+            ("bets", "sport", "TEXT DEFAULT 'nba'")
+        ]
+        cursor = conn.cursor()
+        for table, col, col_type in tables_to_migrate:
+            try:
+                cursor.execute(f"PRAGMA table_info({table});")
+                existing_cols = [r["name"] for r in cursor.fetchall()]
+                if existing_cols and col not in existing_cols:
+                    cursor.execute(f"ALTER TABLE {table} ADD COLUMN {col} {col_type};")
+            except Exception:
+                pass
 
     def execute(self, query: str, params: tuple = ()):
         with self.get_connection() as conn:
