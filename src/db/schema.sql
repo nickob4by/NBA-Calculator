@@ -237,3 +237,22 @@ CREATE TABLE IF NOT EXISTS app_settings (
     value TEXT NOT NULL,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
+
+-- Open & Pending Simulation Bets
+CREATE TABLE IF NOT EXISTS simulation_bets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    sport TEXT NOT NULL,
+    matchup TEXT NOT NULL,
+    team_selected TEXT NOT NULL,
+    stake REAL NOT NULL,
+    odds REAL NOT NULL,
+    model_prob REAL DEFAULT 0.0,
+    edge_pct REAL DEFAULT 0.0,
+    status TEXT NOT NULL DEFAULT 'PENDING', -- 'PENDING', 'WON', 'LOST', 'VOID'
+    pnl REAL DEFAULT 0.0,
+    placed_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    resolved_at TIMESTAMP,
+    note TEXT
+);
+
+CREATE INDEX IF NOT EXISTS idx_sim_bets_status ON simulation_bets (status, placed_at);

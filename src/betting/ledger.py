@@ -216,3 +216,104 @@ class BankrollLedger:
             "net_betting_pnl": net_betting_pnl,
             "roi_pct": roi_pct
         }
+
+    # ================= SIMULATION BETTING LIFECYCLE =================
+
+    @staticmethod
+    def place_simulation_bet(
+        sport: str,
+        matchup: str,
+        team: str,
+        stake: float,
+        odds: float,
+        model_prob: float = 0.0,
+        edge_pct: float = 0.0,
+        note: str = ""
+    ) -> int:
+        """
+        Records an open pending simulation wager to track until game completion.
+        """
+        stake = round(abs(float(stake)), 2)
+        odds = round(float(odds), 2)
+        model_prob = round(float(model_prob), 4)
+        edge_pct = round(float(edge_pct), 4)
+
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO simulation_bets (sport, matchup, team_selected, stake, odds, model_prob, edge_pct, status, note)
+                VALUES (?, ?, ?, ?, ?, ?, ?, 'PENDING', ?)
+            """, (sport.lower(), matchup, team, stake, odds, model_prob, edge_pct, note))
+            return cursor.lastrowid
+
+    @staticmethod
+    def resolve_simulation_bet(bet_id: int, is_win: bool) -> Optional[Dict]:
+        """
+        Grades an open pending simulation bet as WON or LOST,
+        calculates payout, updates the bankroll ledger, and archives the bet.
+        """
+        bet = db.fetch_one("SELECT * FROM simulation_bets WHERE id = ?", (bet_id,))
+        if not bet or bet["status"] != "PENDING":
+            return None
+
+        stake = float(bet["stake"])
+        odds = float(bet["odds"])
+        sport = str(bet["sport"])
+        team = str(bet["team_selected"])
+        matchup = str(bet["matchup"])
+
+        # Record financial transaction in ledger
+        tx_res = BankrollLedger.record_bet(
+            sport=sport,
+            team=team,
+            stake=stake,
+            odds=odds,
+            is_win=is_win,
+            note=f"Sim Bet #{bet_id}: {matchup} ({team})"
+        )
+
+        status_str = "WON" if is_win else "LOST"
+        pnl = tx_res["pnl"]
+
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE simulation_bets
+                SET status = ?, pnl = ?, resolved_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            """, (status_str, pnl, bet_id))
+
+        return {
+            "bet_id": bet_id,
+            "status": status_str,
+            "pnl": pnl,
+            "balance_after": tx_res["balance_after"]
+        }
+
+    @staticmethod
+    def void_simulation_bet(bet_id: int) -> bool:
+        """
+        Cancels / voids a pending simulation bet without financial impact.
+        """
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                UPDATE simulation_bets
+                SET status = 'VOID', resolved_at = CURRENT_TIMESTAMP
+                WHERE id = ? AND status = 'PENDING'
+            """, (bet_id,))
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def get_pending_simulation_bets() -> pd.DataFrame:
+        """
+        Returns all active pending simulation bets awaiting resolution.
+        """
+        return db.fetch_df("SELECT * FROM simulation_bets WHERE status = 'PENDING' ORDER BY id DESC")
+
+    @staticmethod
+    def get_all_simulation_bets() -> pd.DataFrame:
+        """
+        Returns all simulation bets across all statuses.
+        """
+        return db.fetch_df("SELECT * FROM simulation_bets ORDER BY id DESC")

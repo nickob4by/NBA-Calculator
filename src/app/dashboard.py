@@ -359,9 +359,9 @@ if nav_selection == "Matchup Forecast":
         ml_eval = evaluate_moneyline_market(pred_p_home, input_h_ml, input_a_ml, min_edge=min_edge_pct)
         opps = ml_eval["opportunities"]
 
-        st.markdown("##### Valuation Recommendation")
+        st.markdown("##### Valuation & Simulation Bet Placement")
         if not opps:
-            st.info(f"NO VALUE BET IDENTIFIED: Neither team offers an edge exceeding the {min_edge_pct*100:.1f}% minimum threshold. Model recommends PASS.")
+            st.info(f"Neither team offers an edge exceeding your {min_edge_pct*100:.1f}% minimum threshold. Model recommends PASS.")
         else:
             for opp in opps:
                 sizing = size_bet(opp["model_prob"], opp["decimal_odds"], active_bankroll, kelly_multiplier=kelly_mult)
@@ -373,13 +373,13 @@ if nav_selection == "Matchup Forecast":
                 st.markdown(f"""
                 <div class="card-emerald">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 8px;">
-                        <h3 style="color: #ecfdf5; margin: 0; font-size: clamp(16px, 2.5vw, 20px);">RECOMMENDED BET: {bet_team.upper()} TO WIN</h3>
+                        <h3 style="color: #ecfdf5; margin: 0; font-size: clamp(16px, 2.5vw, 20px);">RECOMMENDED VALUE BET: {bet_team.upper()} TO WIN</h3>
                         <span style="background-color: #047857; color: white; padding: 4px 12px; border-radius: 16px; font-weight: 700; font-size: 13px;">+{opp['edge']*100:.1f}% EDGE</span>
                     </div>
                     <hr style="border: 0; border-top: 1px solid #065f46; margin: 12px 0;">
                     <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 10px; text-align: center;">
                         <div style="background: rgba(0,0,0,0.3); padding: 10px; border-radius: 6px;">
-                            <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Stake</div>
+                            <div style="font-size: 11px; color: #a7f3d0; text-transform: uppercase;">Suggested Stake</div>
                             <div style="font-size: clamp(18px, 2.5vw, 22px); font-weight: bold; color: #ffffff;">{config.DEFAULT_CURRENCY}{stake_amt:,.2f}</div>
                             <div style="font-size: 11px; color: #6ee7b7;">{sizing['stake_pct']:.1f}% of {config.DEFAULT_CURRENCY}{active_bankroll:,.0f}</div>
                         </div>
@@ -402,23 +402,114 @@ if nav_selection == "Matchup Forecast":
                 </div>
                 """, unsafe_allow_html=True)
 
-                with st.expander("Record This Wager Outcome into Ledger", expanded=False):
-                    q_res = st.radio("Outcome", options=["Won", "Lost"], horizontal=True, key=f"q_rec_res_{bet_team}")
-                    if st.button("Save Wager to Ledger", type="primary", key=f"q_rec_btn_{bet_team}"):
-                        BankrollLedger.record_bet(
+                sb_c1, sb_c2 = st.columns([1.4, 2.6], vertical_alignment="bottom")
+                with sb_c1:
+                    custom_sim_stake = st.number_input(
+                        f"Simulation Stake ({config.DEFAULT_CURRENCY})",
+                        min_value=1.0,
+                        value=float(stake_amt),
+                        step=10.0,
+                        key=f"sim_stake_in_{bet_team}"
+                    )
+                with sb_c2:
+                    if st.button(f"Place Simulation Bet ({config.DEFAULT_CURRENCY}{custom_sim_stake:,.2f} on {bet_team})", type="primary", key=f"btn_place_sim_{bet_team}"):
+                        bid = BankrollLedger.place_simulation_bet(
                             sport=sport,
+                            matchup=f"{h_name} vs {a_name}",
                             team=bet_team,
-                            stake=stake_amt,
+                            stake=custom_sim_stake,
                             odds=opp["decimal_odds"],
-                            is_win=(q_res == "Won")
+                            model_prob=opp["model_prob"],
+                            edge_pct=opp["edge"]
                         )
-                        st.success(f"Wager on {bet_team} successfully saved!")
+                        st.success(f"Simulation Bet #{bid} placed on {bet_team}! You can grade it as Won/Lost in the Bankroll & Ledger tab later.")
                         st.rerun()
+
+        # Optional Custom Simulation Bet on either team
+        with st.expander("Place Simulation Bet on Competing Teams", expanded=False):
+            with st.form("custom_sim_bet_form"):
+                cs_team = st.selectbox("Pick Team", options=[h_name, a_name], key="cs_pick_team")
+                cs_odds_val = float(input_h_ml) if cs_team == h_name else float(input_a_ml)
+                cs_odds = st.number_input("Decimal Odds", min_value=1.01, value=cs_odds_val, step=0.05, key="cs_odds_input")
+                cs_stake = st.number_input(f"Stake ({config.DEFAULT_CURRENCY})", min_value=1.0, value=50.0, step=10.0, key="cs_stake_input")
+                cs_prob = pred_p_home if cs_team == h_name else pred_p_away
+                
+                if st.form_submit_button("Place Simulation Bet", type="primary"):
+                    bid = BankrollLedger.place_simulation_bet(
+                        sport=sport,
+                        matchup=f"{h_name} vs {a_name}",
+                        team=cs_team,
+                        stake=cs_stake,
+                        odds=cs_odds,
+                        model_prob=cs_prob,
+                        edge_pct=(cs_prob - (1.0 / cs_odds))
+                    )
+                    st.success(f"Simulation Bet #{bid} placed on {cs_team}! Check Bankroll & Ledger to grade outcome.")
+                    st.rerun()
 
 # ================= 2. BANKROLL & LEDGER =================
 elif nav_selection == "Bankroll & Ledger":
-    st.title("Bankroll & Transaction Ledger")
-    st.caption("Personal financial tracking, risk parameters, deposits, withdrawals, and ledger history.")
+    st.markdown("<h2 style='color:#f8fafc; font-weight:700; margin-bottom: 4px;'>Bankroll & Simulation Ledger</h2>", unsafe_allow_html=True)
+    st.caption("Track your simulation bets, record match outcomes, and monitor your balance and ROI.")
+
+    # 1. Open Pending Simulation Bets
+    pending_df = BankrollLedger.get_pending_simulation_bets()
+    st.markdown(f"##### Open Simulation Bets ({len(pending_df)})")
+    if pending_df.empty:
+        st.markdown("""
+        <div class="card-slate" style="text-align: center; padding: 18px; margin-bottom: 16px; border-style: dashed;">
+            <span style="color: #94a3b8; font-size: 13px;">No open simulation bets. Pick a game in <b>Matchup Forecast</b> and click <b>Place Simulation Bet</b> to record wagers here!</span>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        for _, p_bet in pending_df.iterrows():
+            bid = int(p_bet["id"])
+            b_sport = str(p_bet["sport"]).upper()
+            b_matchup = str(p_bet["matchup"])
+            b_team = str(p_bet["team_selected"])
+            b_stake = float(p_bet["stake"])
+            b_odds = float(p_bet["odds"])
+            b_profit = round(b_stake * (b_odds - 1.0), 2)
+            b_payout = round(b_stake * b_odds, 2)
+            b_date = str(p_bet["placed_at"])
+
+            st.markdown(f"""
+            <div class="card-neutral" style="border-left: 4px solid #3b82f6; margin-bottom: 10px;">
+                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                    <div>
+                        <span style="background-color: #1e3a8a; color: #93c5fd; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">{b_sport}</span>
+                        <strong style="color: #f8fafc; font-size: 15px; margin-left: 8px;">{b_matchup}</strong>
+                    </div>
+                    <div style="font-size: 12px; color: #94a3b8;">Placed: {b_date}</div>
+                </div>
+                <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px;">
+                    <span style="color: #cbd5e1;">Pick: <b style="color: #38bdf8;">{b_team}</b></span>
+                    <span style="color: #cbd5e1;">Odds: <b style="color: #ffffff;">{b_odds:.2f}</b></span>
+                    <span style="color: #cbd5e1;">Stake: <b style="color: #ffffff;">{config.DEFAULT_CURRENCY}{b_stake:,.2f}</b></span>
+                    <span style="color: #cbd5e1;">Potential Win: <b style="color: #10b981;">+{config.DEFAULT_CURRENCY}{b_profit:,.2f}</b></span>
+                    <span style="color: #94a3b8;">(Payout: {config.DEFAULT_CURRENCY}{b_payout:,.2f})</span>
+                </div>
+            </div>
+            """, unsafe_allow_html=True)
+
+            btn_c1, btn_c2, btn_c3 = st.columns([1.6, 1.6, 1.2])
+            with btn_c1:
+                if st.button(f"Mark as Won (+{config.DEFAULT_CURRENCY}{b_profit:,.2f})", type="primary", key=f"res_win_{bid}"):
+                    BankrollLedger.resolve_simulation_bet(bid, is_win=True)
+                    st.success(f"Bet #{bid} on {b_team} marked as WON! Profit credited.")
+                    st.rerun()
+            with btn_c2:
+                if st.button(f"Mark as Lost (-{config.DEFAULT_CURRENCY}{b_stake:,.2f})", key=f"res_loss_{bid}"):
+                    BankrollLedger.resolve_simulation_bet(bid, is_win=False)
+                    st.warning(f"Bet #{bid} on {b_team} marked as LOST.")
+                    st.rerun()
+            with btn_c3:
+                if st.button("Cancel / Void", key=f"res_void_{bid}"):
+                    BankrollLedger.void_simulation_bet(bid)
+                    st.info(f"Bet #{bid} cancelled.")
+                    st.rerun()
+
+            st.markdown("<hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'>", unsafe_allow_html=True)
 
     metrics = BankrollLedger.get_ledger_metrics()
 
@@ -430,7 +521,7 @@ elif nav_selection == "Bankroll & Ledger":
     m4.metric("Total Withdrawals", f"{config.DEFAULT_CURRENCY}{metrics['total_withdrawals']:,.2f}")
 
     m5, m6, m7, m8 = st.columns(4)
-    m5.metric("Total Bets Logged", f"{metrics['total_bets']}")
+    m5.metric("Total Bets Settled", f"{metrics['total_bets']}")
     m6.metric("Record (W - L)", f"{metrics['wins']}W - {metrics['losses']}L")
     m7.metric("Win Rate", f"{metrics['win_rate']:.1f}%")
     m8.metric("All-Time ROI", f"{metrics['roi_pct']:+.2f}%")
@@ -468,31 +559,9 @@ elif nav_selection == "Bankroll & Ledger":
                 db.set_setting("min_edge_pct", str(new_edge))
 
     st.markdown("---")
-    act_col1, act_col2, act_col3 = st.columns(3)
+    act_col1, act_col2 = st.columns(2)
 
     with act_col1:
-        with st.expander("Record Wager Result", expanded=True):
-            with st.form("form_record_bet"):
-                f_sport = st.selectbox("Sport", options=["NBA", "MLB"], key="f_sport")
-                f_team = st.text_input("Selection / Team", value="Cincinnati Reds", key="f_team")
-                f_stake = st.number_input(f"Stake ({config.DEFAULT_CURRENCY})", min_value=1.0, value=50.0, step=10.0, key="f_stake")
-                f_odds = st.number_input("Decimal Odds", min_value=1.01, value=2.10, step=0.05, key="f_odds")
-                f_outcome = st.radio("Result", options=["Won", "Lost"], horizontal=True, key="f_outcome")
-                f_note = st.text_input("Note (Optional)", value="", key="f_note")
-                
-                if st.form_submit_button("Save Wager", type="primary"):
-                    res = BankrollLedger.record_bet(
-                        sport=f_sport,
-                        team=f_team,
-                        stake=f_stake,
-                        odds=f_odds,
-                        is_win=(f_outcome == "Won"),
-                        note=f_note
-                    )
-                    st.success(f"Recorded! New Balance: {config.DEFAULT_CURRENCY}{res['balance_after']:,.2f}")
-                    st.rerun()
-
-    with act_col2:
         with st.expander("Deposit / Withdraw Funds", expanded=True):
             with st.form("form_funds"):
                 f_type = st.radio("Transaction Type", options=["Deposit", "Withdrawal"], horizontal=True)
@@ -508,7 +577,7 @@ elif nav_selection == "Bankroll & Ledger":
                         st.success(f"Withdrawn {config.DEFAULT_CURRENCY}{f_amt:,.2f}. New Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
                     st.rerun()
 
-    with act_col3:
+    with act_col2:
         with st.expander("Set Starting Capital", expanded=False):
             with st.form("form_set_capital"):
                 current_init = float(metrics.get("initial_balance", config.DEFAULT_STARTING_BANKROLL))
@@ -552,23 +621,50 @@ elif nav_selection == "Bankroll & Ledger":
         )
         st.plotly_chart(fig_bal, use_container_width=True)
 
-        st.markdown("##### Chronological Transaction History")
-        st.dataframe(
-            ledger_df[["id", "created_at", "tx_type", "amount", "balance_after", "sport", "stake", "odds", "team_selected", "note"]].rename(
-                columns={
-                    "created_at": "Timestamp",
-                    "tx_type": "Type",
-                    "amount": f"Change ({config.DEFAULT_CURRENCY})",
-                    "balance_after": f"Balance ({config.DEFAULT_CURRENCY})",
-                    "sport": "Sport",
-                    "stake": f"Stake ({config.DEFAULT_CURRENCY})",
-                    "odds": "Odds",
-                    "team_selected": "Selection",
-                    "note": "Note"
-                }
-            ),
-            use_container_width=True
-        )
+    st.markdown("##### History & Logs")
+    tab_sim_history, tab_ledger_history = st.tabs(["Simulation Bets History", "Financial Transactions Ledger"])
+
+    with tab_sim_history:
+        sim_all_df = BankrollLedger.get_all_simulation_bets()
+        if not sim_all_df.empty:
+            st.dataframe(
+                sim_all_df[["id", "placed_at", "sport", "matchup", "team_selected", "stake", "odds", "status", "pnl", "resolved_at"]].rename(
+                    columns={
+                        "id": "ID",
+                        "placed_at": "Placed",
+                        "sport": "Sport",
+                        "matchup": "Matchup",
+                        "team_selected": "Selection",
+                        "stake": f"Stake ({config.DEFAULT_CURRENCY})",
+                        "odds": "Odds",
+                        "status": "Status",
+                        "pnl": f"PnL ({config.DEFAULT_CURRENCY})",
+                        "resolved_at": "Settled"
+                    }
+                ),
+                use_container_width=True
+            )
+        else:
+            st.caption("No simulation bets recorded yet.")
+
+    with tab_ledger_history:
+        if not ledger_df.empty:
+            st.dataframe(
+                ledger_df[["id", "created_at", "tx_type", "amount", "balance_after", "sport", "stake", "odds", "team_selected", "note"]].rename(
+                    columns={
+                        "created_at": "Timestamp",
+                        "tx_type": "Type",
+                        "amount": f"Change ({config.DEFAULT_CURRENCY})",
+                        "balance_after": f"Balance ({config.DEFAULT_CURRENCY})",
+                        "sport": "Sport",
+                        "stake": f"Stake ({config.DEFAULT_CURRENCY})",
+                        "odds": "Odds",
+                        "team_selected": "Selection",
+                        "note": "Note"
+                    }
+                ),
+                use_container_width=True
+            )
 
 # ================= 3. TEAM EXPLORER =================
 elif nav_selection == "Team Explorer":
