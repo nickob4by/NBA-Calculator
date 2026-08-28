@@ -32,9 +32,28 @@ def test_dota2_metrics_and_prob():
 
 def test_dota2_models():
     model = Dota2WinProbabilityModel.load()
-    prob = model.predict_proba(1001, 1003, series_format='Bo3')
-    assert 0.0 < prob['p_series_t1'] < 1.0
+    prob = model.predict_proba(1001, 1003, series_format="Bo3")
+    assert 0.0 < prob["p_series_t1"] < 1.0
     
     predictor = Dota2SeriesPredictor.load()
     margin = predictor.predict_maps(1001, 1003)
     assert isinstance(margin, float)
+
+def test_dota2_rosters_and_standins():
+    from src.features.dota2_rosters import get_team_roster_data, calculate_roster_composite_rating
+    
+    falcons_roster = get_team_roster_data(1009)
+    assert "pos1" in falcons_roster
+    assert falcons_roster["pos1"]["name"] == "skiter"
+    assert falcons_roster["pos2"]["name"] == "Malr1ne"
+    assert falcons_roster["pos3"]["name"] == "ATF (Ammar)"
+    
+    # Stand-in penalty test
+    r_full = calculate_roster_composite_rating(1009, standin_penalty=0.0)
+    r_sub = calculate_roster_composite_rating(1009, standin_penalty=3.5)
+    assert r_full > r_sub
+    
+    # Verify probability shifts when team has a stand-in
+    res_normal = calculate_dota2_matchup_prob(1009, 1007, series_format="Bo3", team1_has_standin=False)
+    res_with_sub = calculate_dota2_matchup_prob(1009, 1007, series_format="Bo3", team1_has_standin=True)
+    assert res_normal["p_series_t1"] > res_with_sub["p_series_t1"]

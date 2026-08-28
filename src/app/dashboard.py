@@ -304,9 +304,12 @@ if nav_selection == "Matchup Forecast":
     if home_team_id is not None and away_team_id is not None:
         st.button("🔄 Swap Teams / Sides", key=f"btn_swap_{sport}", on_click=swap_matchup_teams, args=(sport,))
 
-    # Dota 2 Match Format Selector
+    # Dota 2 Match Format & Roster Selector
     dota_format = "Bo3"
+    t1_has_sub = False
+    t2_has_sub = False
     if sport == "dota2" and home_team_id is not None and away_team_id is not None:
+        from src.features.dota2_rosters import get_team_roster_data
         st.markdown("<div style='margin-top: 10px;'></div>", unsafe_allow_html=True)
         fmt_choice = st.selectbox(
             "Tournament Match Format",
@@ -315,6 +318,23 @@ if nav_selection == "Matchup Forecast":
             key="dota2_format_selector"
         )
         dota_format = "Bo1" if "Bo1" in fmt_choice else ("Bo5" if "Bo5" in fmt_choice else ("Bo2" if "Bo2" in fmt_choice else "Bo3"))
+
+        with st.expander("👥 Active 5-Man Player Rosters & Roster Adjustments", expanded=False):
+            r_c1, r_c2 = st.columns(2)
+            t1_ros = get_team_roster_data(home_team_id)
+            t2_ros = get_team_roster_data(away_team_id)
+            with r_c1:
+                st.markdown(f"**{config.get_team_name(home_team_id, sport='dota2')} (Radiant Lineup)**")
+                for pos_k, pos_lbl in [("pos1", "Pos 1 (Carry)"), ("pos2", "Pos 2 (Mid)"), ("pos3", "Pos 3 (Offlane)"), ("pos4", "Pos 4 (Soft Sup)"), ("pos5", "Pos 5 (Hard Sup)")]:
+                    p = t1_ros[pos_k]
+                    st.caption(f"• **{pos_lbl}**: `{p['name']}` ({p['kda']} KDA | {p['gpm']} GPM | {p['rating']} OVR)")
+                t1_has_sub = st.checkbox(f"⚠️ {config.get_team_abbrev(home_team_id, sport='dota2')} Playing with Stand-in / Sub", key=f"sub_{home_team_id}")
+            with r_c2:
+                st.markdown(f"**{config.get_team_name(away_team_id, sport='dota2')} (Dire Lineup)**")
+                for pos_k, pos_lbl in [("pos1", "Pos 1 (Carry)"), ("pos2", "Pos 2 (Mid)"), ("pos3", "Pos 3 (Offlane)"), ("pos4", "Pos 4 (Soft Sup)"), ("pos5", "Pos 5 (Hard Sup)")]:
+                    p = t2_ros[pos_k]
+                    st.caption(f"• **{pos_lbl}**: `{p['name']}` ({p['kda']} KDA | {p['gpm']} GPM | {p['rating']} OVR)")
+                t2_has_sub = st.checkbox(f"⚠️ {config.get_team_abbrev(away_team_id, sport='dota2')} Playing with Stand-in / Sub", key=f"sub_{away_team_id}")
 
     home_sp_fip = None
     away_sp_fip = None
@@ -361,7 +381,14 @@ if nav_selection == "Matchup Forecast":
         a_name = config.get_team_name(away_team_id, sport=sport)
 
         if sport == "dota2":
-            dota_res = calculate_dota2_matchup_prob(home_team_id, away_team_id, series_format=dota_format, is_team1_radiant=True)
+            dota_res = calculate_dota2_matchup_prob(
+                home_team_id,
+                away_team_id,
+                series_format=dota_format,
+                is_team1_radiant=True,
+                team1_has_standin=t1_has_sub,
+                team2_has_standin=t2_has_sub
+            )
             pred_p_home = dota_res["p_series_t1"]
             pred_p_away = dota_res["p_series_t2"]
             pred_margin = float(dota_res["elo_diff"])
@@ -822,34 +849,45 @@ elif nav_selection == "Team Explorer":
         </div>
         """, unsafe_allow_html=True)
     elif exp_sport == "dota2":
+        from src.features.dota2_rosters import get_team_roster_data
         t1_dota = get_dota2_team_metrics(t1_sel)
+        t1_roster = get_team_roster_data(t1_sel)
+        
+        pos_names = {
+            "pos1": "Pos 1 (Hard Carry)",
+            "pos2": "Pos 2 (Mid Lane)",
+            "pos3": "Pos 3 (Offlane)",
+            "pos4": "Pos 4 (Soft Support)",
+            "pos5": "Pos 5 (Hard Support)"
+        }
+        
+        def format_roster_df(ros_dict):
+            rows = []
+            for k, p in ros_dict.items():
+                rows.append({
+                    "Position": pos_names.get(k, k),
+                    "Player Handle": p["name"],
+                    "KDA": p["kda"],
+                    "GPM": p["gpm"],
+                    "OVR Rating": p["rating"],
+                    "Signature Heroes": p["heroes"]
+                })
+            return pd.DataFrame(rows)
+
         if t2_sel is not None:
             t2_dota = get_dota2_team_metrics(t2_sel)
+            t2_roster = get_team_roster_data(t2_sel)
+            
             d_c1, d_c2 = st.columns(2)
             with d_c1:
-                st.markdown(f"**⚔️ {t1_dota['name']} ({t1_dota['abbrev']})**")
-                st.markdown(f"- **Region**: `{t1_dota['region']}`")
-                st.markdown(f"- **Elo Power Rating**: `{t1_dota['elo']:.0f}`")
-                st.markdown(f"- **10-Map Form Win Rate**: `{t1_dota['win_pct_w10']*100:.1f}%`")
-                st.markdown(f"- **Kill/Death Ratio (KDR)**: `{t1_dota['kdr']:.2f}`")
-                st.markdown(f"- **First Blood Rate**: `{t1_dota['first_blood_pct']*100:.1f}%`")
-                st.markdown(f"- **Roshan Control Rate**: `{t1_dota['roshan_pct']*100:.1f}%`")
+                st.markdown(f"**⚔️ {t1_dota['name']} ({t1_dota['abbrev']})** — Elo: `{t1_dota['elo']:.0f}` | Region: `{t1_dota['region']}`")
+                st.dataframe(format_roster_df(t1_roster), use_container_width=True)
             with d_c2:
-                st.markdown(f"**⚔️ {t2_dota['name']} ({t2_dota['abbrev']})**")
-                st.markdown(f"- **Region**: `{t2_dota['region']}`")
-                st.markdown(f"- **Elo Power Rating**: `{t2_dota['elo']:.0f}`")
-                st.markdown(f"- **10-Map Form Win Rate**: `{t2_dota['win_pct_w10']*100:.1f}%`")
-                st.markdown(f"- **Kill/Death Ratio (KDR)**: `{t2_dota['kdr']:.2f}`")
-                st.markdown(f"- **First Blood Rate**: `{t2_dota['first_blood_pct']*100:.1f}%`")
-                st.markdown(f"- **Roshan Control Rate**: `{t2_dota['roshan_pct']*100:.1f}%`")
+                st.markdown(f"**⚔️ {t2_dota['name']} ({t2_dota['abbrev']})** — Elo: `{t2_dota['elo']:.0f}` | Region: `{t2_dota['region']}`")
+                st.dataframe(format_roster_df(t2_roster), use_container_width=True)
         else:
-            st.markdown(f"**⚔️ {t1_dota['name']} ({t1_dota['abbrev']})**")
-            st.markdown(f"- **Region**: `{t1_dota['region']}`")
-            st.markdown(f"- **Elo Power Rating**: `{t1_dota['elo']:.0f}`")
-            st.markdown(f"- **10-Map Form Win Rate**: `{t1_dota['win_pct_w10']*100:.1f}%`")
-            st.markdown(f"- **Kill/Death Ratio (KDR)**: `{t1_dota['kdr']:.2f}`")
-            st.markdown(f"- **First Blood Rate**: `{t1_dota['first_blood_pct']*100:.1f}%`")
-            st.markdown(f"- **Roshan Control Rate**: `{t1_dota['roshan_pct']*100:.1f}%`")
+            st.markdown(f"**⚔️ {t1_dota['name']} ({t1_dota['abbrev']})** — Elo: `{t1_dota['elo']:.0f}` | Region: `{t1_dota['region']}`")
+            st.dataframe(format_roster_df(t1_roster), use_container_width=True)
     elif exp_sport == "mlb":
         from src.features.mlb_pitcher_metrics import get_team_starters
         t1_rot = get_team_starters(t1_sel)

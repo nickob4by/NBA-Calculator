@@ -11,12 +11,14 @@ class Dota2WinProbabilityModel:
     def load():
         return Dota2WinProbabilityModel()
 
-    def predict_proba(self, team1_id: int, team2_id: int, series_format: str = "Bo3", is_radiant: bool = True) -> dict:
+    def predict_proba(self, team1_id: int, team2_id: int, series_format: str = "Bo3", is_radiant: bool = True, team1_has_standin: bool = False, team2_has_standin: bool = False) -> dict:
         return calculate_dota2_matchup_prob(
             team1_id=team1_id,
             team2_id=team2_id,
             series_format=series_format,
-            is_team1_radiant=is_radiant
+            is_team1_radiant=is_radiant,
+            team1_has_standin=team1_has_standin,
+            team2_has_standin=team2_has_standin
         )
 
 class Dota2SeriesPredictor:

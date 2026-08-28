@@ -1,22 +1,7 @@
 [
   {
-    "key": "kelly_mult",
-    "value": "0.2",
-    "updated_at": "2026-08-28 08:44:34"
-  },
-  {
-    "key": "min_edge_pct",
-    "value": "0.05",
-    "updated_at": "2026-08-28 08:44:34"
-  },
-  {
-    "key": "starting_bankroll",
-    "value": "100.0",
-    "updated_at": "2026-08-28 08:44:34"
-  },
-  {
     "key": "sync_test_key",
     "value": "test_value",
-    "updated_at": "2026-08-28 08:45:55"
+    "updated_at": "2026-08-28 08:50:06"
   }
 ]
