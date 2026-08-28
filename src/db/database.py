@@ -1,4 +1,4 @@
-﻿import sqlite3
+import sqlite3
 import pandas as pd
 from pathlib import Path
 from contextlib import contextmanager
@@ -109,5 +109,18 @@ class Database:
     def insert_df(self, df: pd.DataFrame, table_name: str, if_exists: str = "append"):
         with self.get_connection() as conn:
             df.to_sql(table_name, conn, if_exists=if_exists, index=False)
+
+    def get_setting(self, key: str, default: str = "") -> str:
+        row = self.fetch_one("SELECT value FROM app_settings WHERE key = ?", (key,))
+        return str(row["value"]) if row else str(default)
+
+    def set_setting(self, key: str, value: str):
+        with self.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("""
+                INSERT INTO app_settings (key, value, updated_at)
+                VALUES (?, ?, CURRENT_TIMESTAMP)
+                ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP
+            """, (key, str(value)))
 
 db = Database()

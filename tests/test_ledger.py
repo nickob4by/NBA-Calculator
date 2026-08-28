@@ -1,4 +1,4 @@
-﻿import pytest
+import pytest
 from src.betting.ledger import BankrollLedger
 
 def test_ledger_flow():
@@ -35,6 +35,15 @@ def test_ledger_flow():
     assert metrics["win_rate"] == 50.0
     assert metrics["total_staked"] == 100.0
     assert metrics["net_betting_pnl"] == 0.0
+
+    # 7. Test set_starting_balance adjustment
+    # Starting balance was 1200, balance was 1500 (with +300 deposit-withdraw).
+    # If starting balance changes to 2000, new balance should be 2300.
+    new_bal = BankrollLedger.set_starting_balance(2000.0)
+    assert new_bal == 2300.0
+    metrics_rebase = BankrollLedger.get_ledger_metrics()
+    assert metrics_rebase["initial_balance"] == 2000.0
+    assert metrics_rebase["current_balance"] == 2300.0
 
     # Cleanup reset
     BankrollLedger.reset_bankroll(1200.0)

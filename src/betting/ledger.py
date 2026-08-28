@@ -1,4 +1,4 @@
-﻿import pandas as pd
+import pandas as pd
 from typing import Dict, List, Optional
 from src.db.database import db
 import config
@@ -13,21 +13,21 @@ class BankrollLedger:
     def get_current_balance() -> float:
         """
         Returns the latest bankroll balance.
-        If no transactions exist, initializes with DEFAULT_STARTING_BANKROLL (₱1,200.00).
+        If no transactions exist, initializes with stored starting_bankroll or DEFAULT_STARTING_BANKROLL.
         """
         row = db.fetch_one("SELECT balance_after FROM bankroll_transactions ORDER BY id DESC LIMIT 1")
         if row is not None:
             return round(float(row["balance_after"]), 2)
 
         # Initialize default capital if ledger is empty
-        initial_val = float(config.DEFAULT_STARTING_BANKROLL)
+        stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("""
                 INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
                 VALUES ('INITIAL', ?, ?, 'general', 'Initial Starting Capital')
-            """, (initial_val, initial_val))
-        return initial_val
+            """, (stored_init, stored_init))
+        return stored_init
 
     @staticmethod
     def deposit(amount: float, note: str = "Deposit") -> float:
@@ -102,17 +102,57 @@ class BankrollLedger:
         }
 
     @staticmethod
+    def set_starting_balance(new_amount: float) -> float:
+        """
+        Updates the starting capital and recalculates all chronological balances,
+        preserving existing transactions while remembering the new base capital.
+        """
+        new_amount = round(abs(float(new_amount)), 2)
+        db.set_setting("starting_bankroll", str(new_amount))
+
+        rows = db.fetch_all("SELECT * FROM bankroll_transactions ORDER BY id ASC")
+        if not rows:
+            return BankrollLedger.reset_bankroll(new_amount)
+
+        # Check if INITIAL transaction exists
+        has_initial = any(r["tx_type"] == "INITIAL" for r in rows)
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            if not has_initial:
+                # Prepend an initial transaction
+                cursor.execute("""
+                    INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
+                    VALUES ('INITIAL', ?, ?, 'general', 'Starting Capital')
+                """, (new_amount, new_amount))
+            else:
+                cursor.execute("UPDATE bankroll_transactions SET amount = ? WHERE tx_type = 'INITIAL'", (new_amount,))
+
+            # Recompute running balance_after for all records
+            all_txs = cursor.execute("SELECT id, tx_type, amount FROM bankroll_transactions ORDER BY id ASC").fetchall()
+            running_bal = 0.0
+            for tx in all_txs:
+                if tx["tx_type"] == "INITIAL":
+                    running_bal = float(tx["amount"])
+                else:
+                    running_bal += float(tx["amount"])
+                running_bal = round(max(running_bal, 0.0), 2)
+                cursor.execute("UPDATE bankroll_transactions SET balance_after = ? WHERE id = ?", (running_bal, tx["id"]))
+
+        return BankrollLedger.get_current_balance()
+
+    @staticmethod
     def reset_bankroll(initial_amount: float = 1200.0) -> float:
         """
         Clears ledger history and resets starting capital.
         """
         initial_amount = round(abs(float(initial_amount)), 2)
+        db.set_setting("starting_bankroll", str(initial_amount))
         with db.get_connection() as conn:
             cursor = conn.cursor()
             cursor.execute("DELETE FROM bankroll_transactions")
             cursor.execute("""
                 INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
-                VALUES ('INITIAL', ?, ?, 'general', 'Reset Starting Capital')
+                VALUES ('INITIAL', ?, ?, 'general', 'Starting Capital')
             """, (initial_amount, initial_amount))
         return initial_amount
 
@@ -129,11 +169,12 @@ class BankrollLedger:
         Computes aggregate metrics from personal transaction history.
         """
         df = db.fetch_df("SELECT * FROM bankroll_transactions ORDER BY id ASC")
+        stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
         if df.empty:
             curr = BankrollLedger.get_current_balance()
             return {
                 "current_balance": curr,
-                "initial_balance": curr,
+                "initial_balance": stored_init,
                 "total_deposits": 0.0,
                 "total_withdrawals": 0.0,
                 "total_bets": 0,
@@ -146,7 +187,7 @@ class BankrollLedger:
             }
 
         init_row = df[df["tx_type"] == "INITIAL"]
-        initial_bal = float(init_row.iloc[0]["amount"]) if not init_row.empty else float(config.DEFAULT_STARTING_BANKROLL)
+        initial_bal = float(init_row.iloc[0]["amount"]) if not init_row.empty else stored_init
         curr_bal = float(df.iloc[-1]["balance_after"])
 
         deposits = float(df[df["tx_type"] == "DEPOSIT"]["amount"].sum())

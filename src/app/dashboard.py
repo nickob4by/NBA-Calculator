@@ -34,13 +34,14 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# Session state initialization for risk parameters
+# Persistent state initialization from database
+db_kelly = float(db.get_setting("kelly_mult", str(config.DEFAULT_KELLY_FRACTION)))
+db_min_edge = float(db.get_setting("min_edge_pct", str(config.DEFAULT_MIN_EDGE)))
+
 if "kelly_mult" not in st.session_state:
-    st.session_state["kelly_mult"] = float(config.DEFAULT_KELLY_FRACTION)
+    st.session_state["kelly_mult"] = db_kelly
 if "min_edge_pct" not in st.session_state:
-    st.session_state["min_edge_pct"] = float(config.DEFAULT_MIN_EDGE)
-if "custom_bankroll" not in st.session_state:
-    st.session_state["custom_bankroll"] = None
+    st.session_state["min_edge_pct"] = db_min_edge
 
 # Sleek Minimalist Full-Width & Top Navigation CSS
 st.markdown("""
@@ -125,7 +126,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 live_ledger_balance = BankrollLedger.get_current_balance()
-active_bankroll = st.session_state["custom_bankroll"] if st.session_state["custom_bankroll"] is not None else live_ledger_balance
+active_bankroll = live_ledger_balance
 kelly_mult = st.session_state["kelly_mult"]
 min_edge_pct = st.session_state["min_edge_pct"]
 
@@ -441,22 +442,30 @@ elif nav_selection == "Bankroll & Ledger":
     with st.expander("Configure Sizing & Edge Criteria", expanded=True):
         p_col1, p_col2 = st.columns(2)
         with p_col1:
-            st.session_state["kelly_mult"] = st.slider(
+            new_kelly = st.slider(
                 "Fractional Kelly Multiplier",
                 min_value=0.05,
                 max_value=0.50,
                 value=float(st.session_state["kelly_mult"]),
                 step=0.01,
-                help="0.15 = 15% Fractional Kelly"
+                help="0.15 = 15% Fractional Kelly",
+                key="slider_kelly_val"
             )
+            if new_kelly != st.session_state["kelly_mult"]:
+                st.session_state["kelly_mult"] = new_kelly
+                db.set_setting("kelly_mult", str(new_kelly))
         with p_col2:
-            st.session_state["min_edge_pct"] = st.slider(
+            new_edge = st.slider(
                 "Minimum Edge Threshold (%)",
                 min_value=0.5,
                 max_value=10.0,
                 value=float(st.session_state["min_edge_pct"] * 100.0),
-                step=0.5
+                step=0.5,
+                key="slider_min_edge_val"
             ) / 100.0
+            if new_edge != st.session_state["min_edge_pct"]:
+                st.session_state["min_edge_pct"] = new_edge
+                db.set_setting("min_edge_pct", str(new_edge))
 
     st.markdown("---")
     act_col1, act_col2, act_col3 = st.columns(3)
@@ -501,11 +510,28 @@ elif nav_selection == "Bankroll & Ledger":
 
     with act_col3:
         with st.expander("Set Starting Capital", expanded=False):
-            with st.form("form_reset"):
-                f_init = st.number_input(f"New Base Capital ({config.DEFAULT_CURRENCY})", min_value=50.0, value=1200.0, step=100.0)
-                if st.form_submit_button("Reset Base Capital"):
+            with st.form("form_set_capital"):
+                current_init = float(metrics.get("initial_balance", config.DEFAULT_STARTING_BANKROLL))
+                f_init = st.number_input(
+                    f"Base Starting Capital ({config.DEFAULT_CURRENCY})",
+                    min_value=10.0,
+                    value=current_init,
+                    step=100.0,
+                    key="f_init_capital_input"
+                )
+                c_opt1, c_opt2 = st.columns(2)
+                with c_opt1:
+                    btn_update = st.form_submit_button("Update Capital", type="primary")
+                with c_opt2:
+                    btn_wipe = st.form_submit_button("Reset History")
+
+                if btn_update:
+                    new_bal = BankrollLedger.set_starting_balance(f_init)
+                    st.success(f"Starting capital set to {config.DEFAULT_CURRENCY}{f_init:,.2f}! Current balance: {config.DEFAULT_CURRENCY}{new_bal:,.2f}")
+                    st.rerun()
+                elif btn_wipe:
                     BankrollLedger.reset_bankroll(f_init)
-                    st.success(f"Bankroll reset to {config.DEFAULT_CURRENCY}{f_init:,.2f}!")
+                    st.success(f"Bankroll & history reset to {config.DEFAULT_CURRENCY}{f_init:,.2f}!")
                     st.rerun()
 
     # Balance Trajectory Chart

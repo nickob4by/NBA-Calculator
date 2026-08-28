@@ -1,4 +1,4 @@
-﻿-- Multi-Sport Quantitative Database Schema (NBA & MLB)
+-- Multi-Sport Quantitative Database Schema (NBA & MLB)
 
 CREATE TABLE IF NOT EXISTS games (
     game_id TEXT PRIMARY KEY,
@@ -230,3 +230,10 @@ CREATE TABLE IF NOT EXISTS bankroll_transactions (
 );
 
 CREATE INDEX IF NOT EXISTS idx_bt_created_at ON bankroll_transactions (created_at);
+
+-- Key-Value Store for Persistent User Settings & Preferences
+CREATE TABLE IF NOT EXISTS app_settings (
+    key TEXT PRIMARY KEY,
+    value TEXT NOT NULL,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
