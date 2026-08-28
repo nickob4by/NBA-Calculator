@@ -48,8 +48,7 @@ CREATE TABLE IF NOT EXISTS player_game_logs (
     season TEXT NOT NULL,
     is_home INTEGER NOT NULL,
     is_starter INTEGER DEFAULT 0,
-    position_type TEXT DEFAULT 'P', -- 'P' for Pitcher, 'B' for Batter
-    -- Pitcher stats
+    position_type TEXT DEFAULT 'P',
     ip REAL DEFAULT 0.0,
     er INTEGER DEFAULT 0,
     h_allowed INTEGER DEFAULT 0,
@@ -59,7 +58,6 @@ CREATE TABLE IF NOT EXISTS player_game_logs (
     pitches INTEGER DEFAULT 0,
     game_fip REAL,
     game_whip REAL,
-    -- Batter stats
     ab INTEGER DEFAULT 0,
     runs INTEGER DEFAULT 0,
     hits INTEGER DEFAULT 0,
@@ -103,7 +101,6 @@ CREATE TABLE IF NOT EXISTS team_game_logs (
     pf INTEGER,
     pts INTEGER,
     plus_minus REAL,
-    -- MLB Specific Boxscore Stats
     runs INTEGER,
     hits INTEGER,
     errors INTEGER,
@@ -114,7 +111,6 @@ CREATE TABLE IF NOT EXISTS team_game_logs (
     lob INTEGER,
     ip REAL,
     er INTEGER,
-    -- Pitcher IDs for match
     starting_pitcher_id INTEGER,
     starting_pitcher_fip REAL,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -142,7 +138,6 @@ CREATE TABLE IF NOT EXISTS team_advanced_stats (
     opp_tov_pct REAL,
     opp_orb_pct REAL,
     opp_ftr REAL,
-    -- MLB Sabermetrics
     pythag_win_pct REAL,
     obp REAL,
     slg REAL,
@@ -219,3 +214,19 @@ CREATE TABLE IF NOT EXISTS bets (
 );
 
 CREATE INDEX IF NOT EXISTS idx_bets_sport ON bets (sport, placed_at);
+
+-- Personal Bankroll & Transaction Ledger
+CREATE TABLE IF NOT EXISTS bankroll_transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    tx_type TEXT NOT NULL, -- 'INITIAL', 'DEPOSIT', 'WITHDRAWAL', 'BET_WIN', 'BET_LOSS'
+    amount REAL NOT NULL,
+    balance_after REAL NOT NULL,
+    sport TEXT DEFAULT 'general',
+    stake REAL DEFAULT 0.0,
+    odds REAL DEFAULT 1.0,
+    team_selected TEXT DEFAULT '',
+    note TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_bt_created_at ON bankroll_transactions (created_at);
