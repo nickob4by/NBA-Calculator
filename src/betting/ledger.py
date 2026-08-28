@@ -305,6 +305,73 @@ class BankrollLedger:
             return cursor.rowcount > 0
 
     @staticmethod
+    def delete_transaction(tx_id: int) -> float:
+        """
+        Deletes a specific transaction from the ledger and recalculates
+        the running balance_after for all remaining transactions.
+        """
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM bankroll_transactions WHERE id = ?", (tx_id,))
+            
+            # Recompute running balances
+            rows = cursor.execute("SELECT id, tx_type, amount FROM bankroll_transactions ORDER BY id ASC").fetchall()
+            stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
+            
+            if not rows:
+                cursor.execute("""
+                    INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
+                    VALUES ('INITIAL', ?, ?, 'general', 'Starting Capital')
+                """, (stored_init, stored_init))
+            else:
+                running_bal = 0.0
+                for tx in rows:
+                    if tx["tx_type"] == "INITIAL":
+                        running_bal = float(tx["amount"])
+                    else:
+                        running_bal += float(tx["amount"])
+                    running_bal = round(max(running_bal, 0.0), 2)
+                    cursor.execute("UPDATE bankroll_transactions SET balance_after = ? WHERE id = ?", (running_bal, tx["id"]))
+
+        return BankrollLedger.get_current_balance()
+
+    @staticmethod
+    def clear_all_transactions(keep_initial_capital: bool = True) -> float:
+        """
+        Clears all transactions, optionally preserving the initial starting bankroll.
+        """
+        stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM bankroll_transactions")
+            if keep_initial_capital:
+                cursor.execute("""
+                    INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
+                    VALUES ('INITIAL', ?, ?, 'general', 'Starting Capital')
+                """, (stored_init, stored_init))
+        return BankrollLedger.get_current_balance()
+
+    @staticmethod
+    def delete_simulation_bet(bet_id: int) -> bool:
+        """
+        Deletes a specific bet record from simulation_bets.
+        """
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM simulation_bets WHERE id = ?", (bet_id,))
+            return cursor.rowcount > 0
+
+    @staticmethod
+    def clear_all_simulation_bets() -> int:
+        """
+        Clears all bet records from simulation_bets.
+        """
+        with db.get_connection() as conn:
+            cursor = conn.cursor()
+            cursor.execute("DELETE FROM simulation_bets")
+            return cursor.rowcount
+
+    @staticmethod
     def get_pending_simulation_bets() -> pd.DataFrame:
         """
         Returns all active pending simulation bets awaiting resolution.

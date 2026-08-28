@@ -655,6 +655,33 @@ elif nav_selection == "Bankroll & Ledger":
                 ),
                 use_container_width=True
             )
+
+            # Deletion Controls for Bets History
+            with st.expander("Manage & Delete Bet History", expanded=False):
+                del_c1, del_c2 = st.columns(2)
+                with del_c1:
+                    bet_options = {
+                        int(row["id"]): f"ID #{row['id']} - {str(row['sport']).upper()}: {row['team_selected']} ({row['status']} | {config.DEFAULT_CURRENCY}{float(row['stake']):,.2f})"
+                        for _, row in sim_all_df.iterrows()
+                    }
+                    sel_bet_id = st.selectbox(
+                        "Select Bet to Delete",
+                        options=list(bet_options.keys()),
+                        format_func=lambda x: bet_options[x],
+                        key="sel_bet_del_box"
+                    )
+                    if st.button("Delete Selected Bet", type="primary", key="btn_del_single_bet"):
+                        BankrollLedger.delete_simulation_bet(sel_bet_id)
+                        st.session_state["bet_notification"] = f"Bet #{sel_bet_id} removed from history."
+                        st.rerun()
+
+                with del_c2:
+                    st.write("**Bulk Action**")
+                    st.caption("Permanently clears all bet history entries.")
+                    if st.button("Clear All Bets History", key="btn_clear_all_bets"):
+                        cnt = BankrollLedger.clear_all_simulation_bets()
+                        st.session_state["bet_notification"] = f"Cleared {cnt} bets from history."
+                        st.rerun()
         else:
             st.caption("No bets recorded yet.")
 
@@ -676,6 +703,33 @@ elif nav_selection == "Bankroll & Ledger":
                 ),
                 use_container_width=True
             )
+
+            # Deletion Controls for Ledger Transactions
+            with st.expander("Manage & Delete Ledger Transactions", expanded=False):
+                tx_del_c1, tx_del_c2 = st.columns(2)
+                with tx_del_c1:
+                    tx_options = {
+                        int(row["id"]): f"ID #{row['id']} - {row['tx_type']}: {config.DEFAULT_CURRENCY}{float(row['amount']):+,.2f} (Bal: {config.DEFAULT_CURRENCY}{float(row['balance_after']):,.2f})"
+                        for _, row in ledger_df.iterrows()
+                    }
+                    sel_tx_id = st.selectbox(
+                        "Select Transaction to Delete",
+                        options=list(tx_options.keys()),
+                        format_func=lambda x: tx_options[x],
+                        key="sel_tx_del_box"
+                    )
+                    if st.button("Delete Selected Transaction", type="primary", key="btn_del_single_tx"):
+                        new_bal = BankrollLedger.delete_transaction(sel_tx_id)
+                        st.session_state["bet_notification"] = f"Transaction #{sel_tx_id} deleted. Recalculated balance: {config.DEFAULT_CURRENCY}{new_bal:,.2f}"
+                        st.rerun()
+
+                with tx_del_c2:
+                    st.write("**Bulk Action**")
+                    st.caption("Clears all transactions while preserving your base starting capital.")
+                    if st.button("Clear All Transactions", key="btn_clear_all_txs"):
+                        new_bal = BankrollLedger.clear_all_transactions(keep_initial_capital=True)
+                        st.session_state["bet_notification"] = f"All transactions cleared. Base balance: {config.DEFAULT_CURRENCY}{new_bal:,.2f}"
+                        st.rerun()
 
 # ================= 3. TEAM EXPLORER =================
 elif nav_selection == "Team Explorer":

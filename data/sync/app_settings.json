@@ -1,12 +1,12 @@
 [
   {
     "key": "starting_bankroll",
-    "value": "100.0",
-    "updated_at": "2026-08-28 07:43:25"
+    "value": "1200.0",
+    "updated_at": "2026-08-28 07:46:54"
   },
   {
     "key": "sync_test_key",
     "value": "test_value",
-    "updated_at": "2026-08-28 07:43:25"
+    "updated_at": "2026-08-28 07:47:28"
   }
 ]

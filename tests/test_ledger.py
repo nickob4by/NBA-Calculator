@@ -50,6 +50,7 @@ def test_ledger_flow():
 
 def test_simulation_betting_lifecycle():
     BankrollLedger.reset_bankroll(1200.0)
+    BankrollLedger.clear_all_simulation_bets()
 
     # 1. Place simulation bet
     bet_id1 = BankrollLedger.place_simulation_bet(
@@ -109,6 +110,43 @@ def test_simulation_betting_lifecycle():
     )
     assert BankrollLedger.void_simulation_bet(bet_id3) is True
     assert len(BankrollLedger.get_pending_simulation_bets()) == 0
+
+    # Cleanup
+    BankrollLedger.reset_bankroll(1200.0)
+
+def test_deletion_and_clear_methods():
+    BankrollLedger.reset_bankroll(1000.0)
+
+    # 1. Add deposit and bets
+    tx_dep = BankrollLedger.deposit(500.0, "Test Deposit")
+    assert BankrollLedger.get_current_balance() == 1500.0
+
+    b_id = BankrollLedger.place_simulation_bet("nba", "BOS vs MIA", "BOS", 100.0, 2.00)
+    BankrollLedger.resolve_simulation_bet(b_id, is_win=True)
+    assert BankrollLedger.get_current_balance() == 1600.0
+
+    # 2. Test delete_simulation_bet
+    assert BankrollLedger.delete_simulation_bet(b_id) is True
+    assert BankrollLedger.delete_simulation_bet(99999) is False
+
+    # 3. Test clear_all_simulation_bets
+    BankrollLedger.place_simulation_bet("mlb", "LAD vs SF", "LAD", 50.0, 1.80)
+    cnt = BankrollLedger.clear_all_simulation_bets()
+    assert cnt >= 1
+
+    # 4. Test delete_transaction
+    tx_df = BankrollLedger.get_ledger_history()
+    dep_row = tx_df[tx_df["tx_type"] == "DEPOSIT"].iloc[0]
+    dep_id = int(dep_row["id"])
+    
+    # After deleting deposit of 500, balance should drop by 500 (from 1600 to 1100)
+    new_bal = BankrollLedger.delete_transaction(dep_id)
+    assert new_bal == 1100.0
+
+    # 5. Test clear_all_transactions
+    bal_after_clear = BankrollLedger.clear_all_transactions(keep_initial_capital=True)
+    assert bal_after_clear == 1000.0
+    assert len(BankrollLedger.get_ledger_history()) == 1
 
     # Cleanup
     BankrollLedger.reset_bankroll(1200.0)
