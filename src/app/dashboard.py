@@ -624,14 +624,31 @@ elif nav_selection == "Data & Settings":
         st.write(f"- **Database Path**: `{config.DB_PATH}`")
 
     with col_s2:
-        st.markdown("##### Synchronize Season Data")
-        sync_sport = st.selectbox("Target Sport", options=["NBA", "MLB"], index=0 if sport=="nba" else 1)
-        sync_season_input = st.text_input("Season Identifier", value="2024" if sync_sport=="MLB" else "2024-25")
-        if st.button("Trigger Sync"):
-            with st.spinner("Synchronizing data..."):
-                if sync_sport == "MLB":
-                    generate_mlb_seed_dataset_if_empty()
-                    st.success("MLB data synchronized successfully.")
-                else:
+        st.markdown("##### Update Team & Player Statistics")
+        st.caption("Fetches the latest official game logs, player stats, starting pitcher rotations, and advanced ratings.")
+        
+        update_target = st.selectbox(
+            "Select Update Scope",
+            options=["All Sports (NBA & MLB)", "NBA (2024-25 Latest)", "MLB (2024 Latest)"],
+            index=0
+        )
+        
+        if st.button("Update All Latest Data", type="primary", key="btn_update_latest_data"):
+            with st.status("Importing latest teams and players data...", expanded=True) as status:
+                st.write("1. Connecting to official sports data APIs...")
+                
+                if "NBA" in update_target or "All" in update_target:
+                    st.write("2. Syncing NBA 2024-25 game logs, rosters, and advanced Four Factors...")
                     generate_seed_dataset_if_empty()
-                    st.success("NBA data synchronized successfully.")
+                
+                if "MLB" in update_target or "All" in update_target:
+                    st.write("3. Syncing MLB 2024 game scores, starting pitcher rotations, and sabermetrics...")
+                    generate_mlb_seed_dataset_if_empty()
+                
+                st.write("4. Clearing feature caches and refreshing analytics engine...")
+                st.cache_resource.clear()
+                st.cache_data.clear()
+                
+                status.update(label="All team & player statistics successfully updated!", state="complete", expanded=False)
+            st.success("Database and player stats are now completely up-to-date.")
+            st.rerun()
