@@ -537,15 +537,15 @@ elif nav_selection == "Bankroll & Ledger":
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Search & Filter Controls
-        s_col1, s_col2 = st.columns([3.2, 1.3])
+        # Search, Sport Filter & Sorter Controls
+        s_col1, s_col2, s_col3 = st.columns([2.4, 1.2, 1.4])
         with s_col1:
             st.markdown("""
             <div style="position: relative; width: 100%; margin-bottom: 8px;">
                 <input 
                     type="text" 
                     id="live-open-bets-search-input" 
-                    placeholder="🔍 Type to search instantly by team, matchup, sport, or ID (e.g. Tigers, Boston, #63)..." 
+                    placeholder="🔍 Type to search (e.g. Tigers, Boston, #63)..." 
                     autocomplete="off"
                     style="
                         width: 100%; 
@@ -590,10 +590,40 @@ elif nav_selection == "Bankroll & Ledger":
                 key="filter_open_bets_sport_select"
             )
 
+        with s_col3:
+            sort_by = st.selectbox(
+                "Sort Open Bets",
+                options=[
+                    "Newest First",
+                    "Oldest First",
+                    "Stake: High to Low",
+                    "Stake: Low to High",
+                    "Odds: High to Low",
+                    "Potential Profit: High to Low"
+                ],
+                label_visibility="collapsed",
+                key="sort_open_bets_select"
+            )
+
         # Apply Sport Filter
         filtered_df = pending_df.copy()
         if filter_sport != "All Sports":
             filtered_df = filtered_df[filtered_df["sport"].str.upper() == filter_sport]
+
+        # Apply Sorter
+        if sort_by == "Newest First":
+            filtered_df = filtered_df.sort_values(by="id", ascending=False)
+        elif sort_by == "Oldest First":
+            filtered_df = filtered_df.sort_values(by="id", ascending=True)
+        elif sort_by == "Stake: High to Low":
+            filtered_df = filtered_df.sort_values(by="stake", ascending=False)
+        elif sort_by == "Stake: Low to High":
+            filtered_df = filtered_df.sort_values(by="stake", ascending=True)
+        elif sort_by == "Odds: High to Low":
+            filtered_df = filtered_df.sort_values(by="odds", ascending=False)
+        elif sort_by == "Potential Profit: High to Low":
+            filtered_df["potential_profit"] = filtered_df["stake"] * (filtered_df["odds"] - 1.0)
+            filtered_df = filtered_df.sort_values(by="potential_profit", ascending=False)
 
         # Header with Live Dynamic Count Indicator
         st.markdown(f"<h5 id='open-bets-header-count' style='margin-top: 4px; margin-bottom: 12px;'>Open Bets ({len(filtered_df)})</h5>", unsafe_allow_html=True)
