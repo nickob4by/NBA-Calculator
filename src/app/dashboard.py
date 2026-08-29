@@ -524,62 +524,126 @@ elif nav_selection == "Bankroll & Ledger":
 
     # 1. Open Pending Bets
     pending_df = BankrollLedger.get_pending_simulation_bets()
-    st.markdown(f"##### Open Bets ({len(pending_df)})")
+    total_open_count = len(pending_df)
+    
     if pending_df.empty:
+        st.markdown(f"##### Open Bets (0)")
         st.markdown("""
         <div class="card-slate" style="text-align: center; padding: 18px; margin-bottom: 16px; border-style: dashed;">
             <span style="color: #94a3b8; font-size: 13px;">No open bets. Pick a game in <b>Matchup Forecast</b> and click <b>Place Bet</b> to record wagers here!</span>
         </div>
         """, unsafe_allow_html=True)
     else:
-        for _, p_bet in pending_df.iterrows():
-            bid = int(p_bet["id"])
-            b_sport = str(p_bet["sport"]).upper()
-            b_matchup = str(p_bet["matchup"])
-            b_team = str(p_bet["team_selected"])
-            b_stake = float(p_bet["stake"])
-            b_odds = float(p_bet["odds"])
-            b_profit = round(b_stake * (b_odds - 1.0), 2)
-            b_payout = round(b_stake * b_odds, 2)
-            b_date = str(p_bet["placed_at"])
+        # Search & Filter Bar
+        s_col1, s_col2, s_col3 = st.columns([2.5, 1.2, 1.3])
+        with s_col1:
+            search_query = st.text_input(
+                "Search Open Bets",
+                placeholder="🔍 Search by team, matchup, sport, or ID (e.g. Tigers, Mets, #60)...",
+                label_visibility="collapsed",
+                key="search_open_bets_input"
+            )
+        with s_col2:
+            filter_sport = st.selectbox(
+                "Filter Sport",
+                options=["All Sports", "MLB", "NBA"],
+                label_visibility="collapsed",
+                key="filter_open_bets_sport_select"
+            )
+        with s_col3:
+            sort_by = st.selectbox(
+                "Sort Open Bets",
+                options=["Newest First", "Oldest First", "Stake: High to Low", "Odds: High to Low"],
+                label_visibility="collapsed",
+                key="sort_open_bets_select"
+            )
 
+        # Apply Filtering
+        filtered_df = pending_df.copy()
+        if filter_sport != "All Sports":
+            filtered_df = filtered_df[filtered_df["sport"].str.upper() == filter_sport]
+        
+        if search_query.strip():
+            q = search_query.strip().lower().lstrip("#")
+            filtered_df = filtered_df[
+                filtered_df["team_selected"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["matchup"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["sport"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["id"].astype(str).str.contains(q, na=False)
+            ]
+
+        # Apply Sorting
+        if sort_by == "Newest First":
+            filtered_df = filtered_df.sort_values(by="id", ascending=False)
+        elif sort_by == "Oldest First":
+            filtered_df = filtered_df.sort_values(by="id", ascending=True)
+        elif sort_by == "Stake: High to Low":
+            filtered_df = filtered_df.sort_values(by="stake", ascending=False)
+        elif sort_by == "Odds: High to Low":
+            filtered_df = filtered_df.sort_values(by="odds", ascending=False)
+
+        # Header with Count Indicator
+        if len(filtered_df) == total_open_count:
+            st.markdown(f"##### Open Bets ({total_open_count})")
+        else:
+            st.markdown(f"##### Open Bets ({len(filtered_df)} of {total_open_count} matching)")
+
+        if filtered_df.empty:
             st.markdown(f"""
-            <div class="card-neutral" style="border-left: 4px solid #3b82f6; margin-bottom: 10px;">
-                <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
-                    <div>
-                        <span style="background-color: #1e3a8a; color: #93c5fd; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">{b_sport}</span>
-                        <strong style="color: #f8fafc; font-size: 15px; margin-left: 8px;">{b_matchup}</strong>
-                    </div>
-                    <div style="font-size: 12px; color: #94a3b8;">Placed: {b_date}</div>
-                </div>
-                <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px;">
-                    <span style="color: #cbd5e1;">Pick: <b style="color: #38bdf8;">{b_team}</b></span>
-                    <span style="color: #cbd5e1;">Odds: <b style="color: #ffffff;">{b_odds:.2f}</b></span>
-                    <span style="color: #cbd5e1;">Stake: <b style="color: #ffffff;">{config.DEFAULT_CURRENCY}{b_stake:,.2f}</b></span>
-                    <span style="color: #cbd5e1;">Potential Win: <b style="color: #10b981;">+{config.DEFAULT_CURRENCY}{b_profit:,.2f}</b></span>
-                    <span style="color: #94a3b8;">(Payout: {config.DEFAULT_CURRENCY}{b_payout:,.2f})</span>
-                </div>
+            <div class="card-slate" style="text-align: center; padding: 18px; margin-bottom: 16px; border-style: dashed;">
+                <span style="color: #94a3b8; font-size: 13px;">No open bets matching <b>"{search_query}"</b>. Try adjusting your search query or sport filter.</span>
             </div>
             """, unsafe_allow_html=True)
+        else:
+            for _, p_bet in filtered_df.iterrows():
+                bid = int(p_bet["id"])
+                b_sport = str(p_bet["sport"]).upper()
+                b_matchup = str(p_bet["matchup"])
+                b_team = str(p_bet["team_selected"])
+                b_stake = float(p_bet["stake"])
+                b_odds = float(p_bet["odds"])
+                b_profit = round(b_stake * (b_odds - 1.0), 2)
+                b_payout = round(b_stake * b_odds, 2)
+                b_date = str(p_bet["placed_at"])
 
-            btn_c1, btn_c2, btn_c3 = st.columns([1.6, 1.6, 1.2])
-            with btn_c1:
-                if st.button(f"Mark as Won (+{config.DEFAULT_CURRENCY}{b_profit:,.2f})", type="primary", key=f"res_win_{bid}"):
-                    BankrollLedger.resolve_simulation_bet(bid, is_win=True)
-                    st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as WON! +{config.DEFAULT_CURRENCY}{b_profit:,.2f} profit credited."
-                    st.rerun()
-            with btn_c2:
-                if st.button(f"Mark as Lost (-{config.DEFAULT_CURRENCY}{b_stake:,.2f})", key=f"res_loss_{bid}"):
-                    BankrollLedger.resolve_simulation_bet(bid, is_win=False)
-                    st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as LOST. -{config.DEFAULT_CURRENCY}{b_stake:,.2f} deducted."
-                    st.rerun()
-            with btn_c3:
-                if st.button("Cancel / Void", key=f"res_void_{bid}"):
-                    BankrollLedger.void_simulation_bet(bid)
-                    st.session_state["bet_notification"] = f"Bet #{bid} cancelled."
-                    st.rerun()
+                st.markdown(f"""
+                <div class="card-neutral" style="border-left: 4px solid #3b82f6; margin-bottom: 10px;">
+                    <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
+                        <div>
+                            <span style="background-color: #1e3a8a; color: #93c5fd; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">{b_sport}</span>
+                            <span style="background-color: #0f172a; color: #38bdf8; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; margin-left: 6px; border: 1px solid #1e293b;">#{bid}</span>
+                            <strong style="color: #f8fafc; font-size: 15px; margin-left: 8px;">{b_matchup}</strong>
+                        </div>
+                        <div style="font-size: 12px; color: #94a3b8;">Placed: {b_date}</div>
+                    </div>
+                    <div style="display: flex; gap: 16px; flex-wrap: wrap; font-size: 14px; margin-bottom: 6px;">
+                        <span style="color: #cbd5e1;">Pick: <b style="color: #38bdf8;">{b_team}</b></span>
+                        <span style="color: #cbd5e1;">Odds: <b style="color: #ffffff;">{b_odds:.2f}</b></span>
+                        <span style="color: #cbd5e1;">Stake: <b style="color: #ffffff;">{config.DEFAULT_CURRENCY}{b_stake:,.2f}</b></span>
+                        <span style="color: #cbd5e1;">Potential Win: <b style="color: #10b981;">+{config.DEFAULT_CURRENCY}{b_profit:,.2f}</b></span>
+                        <span style="color: #94a3b8;">(Payout: {config.DEFAULT_CURRENCY}{b_payout:,.2f})</span>
+                    </div>
+                </div>
+                """, unsafe_allow_html=True)
 
-            st.markdown("<hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'>", unsafe_allow_html=True)
+                btn_c1, btn_c2, btn_c3 = st.columns([1.6, 1.6, 1.2])
+                with btn_c1:
+                    if st.button(f"Mark as Won (+{config.DEFAULT_CURRENCY}{b_profit:,.2f})", type="primary", key=f"res_win_{bid}"):
+                        BankrollLedger.resolve_simulation_bet(bid, is_win=True)
+                        st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as WON! +{config.DEFAULT_CURRENCY}{b_profit:,.2f} profit credited."
+                        st.rerun()
+                with btn_c2:
+                    if st.button(f"Mark as Lost (-{config.DEFAULT_CURRENCY}{b_stake:,.2f})", key=f"res_loss_{bid}"):
+                        BankrollLedger.resolve_simulation_bet(bid, is_win=False)
+                        st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as LOST. -{config.DEFAULT_CURRENCY}{b_stake:,.2f} deducted."
+                        st.rerun()
+                with btn_c3:
+                    if st.button("Cancel / Void", key=f"res_void_{bid}"):
+                        BankrollLedger.void_simulation_bet(bid)
+                        st.session_state["bet_notification"] = f"Bet #{bid} cancelled."
+                        st.rerun()
+
+                st.markdown("<hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'>", unsafe_allow_html=True)
 
     metrics = BankrollLedger.get_ledger_metrics()
 
