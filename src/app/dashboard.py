@@ -501,11 +501,14 @@ if nav_selection == "Matchup Forecast":
                 cs_team = st.selectbox("Pick Team", options=[h_name, a_name], key="cs_pick_team")
                 cs_odds_val = float(input_h_ml) if cs_team == h_name else float(input_a_ml)
                 cs_odds = st.number_input("Decimal Odds", min_value=1.01, value=cs_odds_val, step=0.05, key="cs_odds_input")
-                cs_stake = st.number_input(f"Stake ({config.DEFAULT_CURRENCY})", min_value=1.0, value=50.0, step=10.0, key="cs_stake_input")
+                cs_stake = st.number_input(f"Stake ({config.DEFAULT_CURRENCY})", min_value=0.0, value=10.0, step=1.0, key="cs_stake_input")
                 cs_prob = pred_p_home if cs_team == h_name else pred_p_away
                 
                 if st.form_submit_button("Place Bet", type="primary"):
-                    bid = BankrollLedger.place_simulation_bet(
+                    if cs_stake <= 0.0:
+                        st.warning("Please enter a stake amount greater than 0.")
+                    else:
+                        bid = BankrollLedger.place_simulation_bet(
                         sport=sport,
                         matchup=f"{h_name} vs {a_name}",
                         team=cs_team,
@@ -701,17 +704,20 @@ elif nav_selection == "Bankroll & Ledger":
         with st.expander("Deposit / Withdraw Funds", expanded=True):
             with st.form("form_funds"):
                 f_type = st.radio("Transaction Type", options=["Deposit", "Withdrawal"], horizontal=True)
-                f_amt = st.number_input(f"Amount ({config.DEFAULT_CURRENCY})", min_value=10.0, value=500.0, step=50.0)
+                f_amt = st.number_input(f"Amount ({config.DEFAULT_CURRENCY})", min_value=0.0, value=0.0, step=10.0)
                 f_fund_note = st.text_input("Note", value="Account top-up" if f_type=="Deposit" else "Cashout")
                 
                 if st.form_submit_button("Submit Transaction"):
-                    if f_type == "Deposit":
+                    if f_amt <= 0.0:
+                        st.warning("Please enter an amount greater than 0 to submit a transaction.")
+                    elif f_type == "Deposit":
                         bal = BankrollLedger.deposit(f_amt, f_fund_note)
-                        st.success(f"Deposited {config.DEFAULT_CURRENCY}{f_amt:,.2f}. New Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
+                        st.success(f"Deposited {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
+                        st.rerun()
                     else:
                         bal = BankrollLedger.withdraw(f_amt, f_fund_note)
-                        st.success(f"Withdrawn {config.DEFAULT_CURRENCY}{f_amt:,.2f}. New Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
-                    st.rerun()
+                        st.success(f"Withdrawn {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
+                        st.rerun()
 
     with act_col2:
         with st.expander("Set Starting Capital", expanded=False):
@@ -719,9 +725,9 @@ elif nav_selection == "Bankroll & Ledger":
                 current_init = float(metrics.get("initial_balance", config.DEFAULT_STARTING_BANKROLL))
                 f_init = st.number_input(
                     f"Base Starting Capital ({config.DEFAULT_CURRENCY})",
-                    min_value=10.0,
+                    min_value=0.0,
                     value=current_init,
-                    step=100.0,
+                    step=50.0,
                     key="f_init_capital_input"
                 )
                 c_opt1, c_opt2 = st.columns(2)
@@ -732,7 +738,7 @@ elif nav_selection == "Bankroll & Ledger":
 
                 if btn_update:
                     new_bal = BankrollLedger.set_starting_balance(f_init)
-                    st.success(f"Starting capital set to {config.DEFAULT_CURRENCY}{f_init:,.2f}! Current balance: {config.DEFAULT_CURRENCY}{new_bal:,.2f}")
+                    st.success(f"Starting capital set to {config.DEFAULT_CURRENCY}{f_init:,.2f}! Available balance: {config.DEFAULT_CURRENCY}{new_bal:,.2f}")
                     st.rerun()
                 elif btn_wipe:
                     BankrollLedger.reset_bankroll(f_init)
