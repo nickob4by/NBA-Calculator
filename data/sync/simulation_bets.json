@@ -158,10 +158,10 @@
     "odds": 2.55,
     "model_prob": 0.4514,
     "edge_pct": 0.0779,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "WON",
+    "pnl": 3.02,
     "placed_at": "2026-08-28 09:10:34",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 00:37:43",
     "note": ""
   },
   {
