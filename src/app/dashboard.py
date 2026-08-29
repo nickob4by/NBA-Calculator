@@ -537,15 +537,51 @@ elif nav_selection == "Bankroll & Ledger":
         </div>
         """, unsafe_allow_html=True)
     else:
-        # Search & Filter Bar
-        s_col1, s_col2, s_col3 = st.columns([2.5, 1.2, 1.3])
+        # Search & Filter Controls
+        s_col1, s_col2 = st.columns([3.2, 1.3])
         with s_col1:
-            search_query = st.text_input(
-                "Search Open Bets",
-                placeholder="🔍 Search by team, matchup, sport, or ID (e.g. Tigers, Mets, #60)...",
-                label_visibility="collapsed",
-                key="search_open_bets_input"
-            )
+            st.markdown("""
+            <div style="position: relative; width: 100%; margin-bottom: 8px;">
+                <input 
+                    type="text" 
+                    id="live-open-bets-search-input" 
+                    placeholder="🔍 Type to search instantly by team, matchup, sport, or ID (e.g. Tigers, Boston, #63)..." 
+                    autocomplete="off"
+                    style="
+                        width: 100%; 
+                        padding: 9px 36px 9px 12px; 
+                        background-color: #0f172a; 
+                        color: #f8fafc; 
+                        border: 1px solid #334155; 
+                        border-radius: 8px; 
+                        font-size: 14px; 
+                        outline: none; 
+                        box-sizing: border-box;
+                        transition: border-color 0.15s ease-in-out;
+                    "
+                    onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 1px #38bdf8';"
+                    onblur="this.style.borderColor='#334155'; this.style.boxShadow='none';"
+                    oninput="window.runLiveBetSearch ? window.runLiveBetSearch() : null;"
+                />
+                <span 
+                    id="clear-search-btn"
+                    onclick="var el=document.getElementById('live-open-bets-search-input'); if(el){ el.value=''; if(window.runLiveBetSearch) window.runLiveBetSearch(); el.focus(); }"
+                    style="
+                        position: absolute; 
+                        right: 12px; 
+                        top: 50%; 
+                        transform: translateY(-50%); 
+                        color: #94a3b8; 
+                        cursor: pointer; 
+                        font-size: 16px;
+                        user-select: none;
+                        display: inline-block;
+                    "
+                    title="Clear search"
+                >✕</span>
+            </div>
+            """, unsafe_allow_html=True)
+            
         with s_col2:
             filter_sport = st.selectbox(
                 "Filter Sport",
@@ -553,64 +589,37 @@ elif nav_selection == "Bankroll & Ledger":
                 label_visibility="collapsed",
                 key="filter_open_bets_sport_select"
             )
-        with s_col3:
-            sort_by = st.selectbox(
-                "Sort Open Bets",
-                options=["Newest First", "Oldest First", "Stake: High to Low", "Odds: High to Low"],
-                label_visibility="collapsed",
-                key="sort_open_bets_select"
-            )
 
-        # Apply Filtering
+        # Apply Sport Filter
         filtered_df = pending_df.copy()
         if filter_sport != "All Sports":
             filtered_df = filtered_df[filtered_df["sport"].str.upper() == filter_sport]
-        
-        if search_query.strip():
-            q = search_query.strip().lower().lstrip("#")
-            filtered_df = filtered_df[
-                filtered_df["team_selected"].astype(str).str.lower().str.contains(q, na=False) |
-                filtered_df["matchup"].astype(str).str.lower().str.contains(q, na=False) |
-                filtered_df["sport"].astype(str).str.lower().str.contains(q, na=False) |
-                filtered_df["id"].astype(str).str.contains(q, na=False)
-            ]
 
-        # Apply Sorting
-        if sort_by == "Newest First":
-            filtered_df = filtered_df.sort_values(by="id", ascending=False)
-        elif sort_by == "Oldest First":
-            filtered_df = filtered_df.sort_values(by="id", ascending=True)
-        elif sort_by == "Stake: High to Low":
-            filtered_df = filtered_df.sort_values(by="stake", ascending=False)
-        elif sort_by == "Odds: High to Low":
-            filtered_df = filtered_df.sort_values(by="odds", ascending=False)
+        # Header with Live Dynamic Count Indicator
+        st.markdown(f"<h5 id='open-bets-header-count' style='margin-top: 4px; margin-bottom: 12px;'>Open Bets ({len(filtered_df)})</h5>", unsafe_allow_html=True)
 
-        # Header with Count Indicator
-        if len(filtered_df) == total_open_count:
-            st.markdown(f"##### Open Bets ({total_open_count})")
-        else:
-            st.markdown(f"##### Open Bets ({len(filtered_df)} of {total_open_count} matching)")
+        # Container for no matches
+        st.markdown("""
+        <div id="live-no-matches-box" class="card-slate" style="display: none; text-align: center; padding: 18px; margin-bottom: 16px; border-style: dashed;">
+            <span style="color: #94a3b8; font-size: 13px;">No open bets matching "<b id='live-search-query-display' style='color:#38bdf8;'></b>". Try a different team or bet ID.</span>
+        </div>
+        """, unsafe_allow_html=True)
 
-        if filtered_df.empty:
+        for _, p_bet in filtered_df.iterrows():
+            bid = int(p_bet["id"])
+            b_sport = str(p_bet["sport"]).upper()
+            b_matchup = str(p_bet["matchup"])
+            b_team = str(p_bet["team_selected"])
+            b_stake = float(p_bet["stake"])
+            b_odds = float(p_bet["odds"])
+            b_profit = round(b_stake * (b_odds - 1.0), 2)
+            b_payout = round(b_stake * b_odds, 2)
+            b_date = str(p_bet["placed_at"])
+            search_str = f"{b_sport.lower()} {bid} #{bid} {b_matchup.lower()} {b_team.lower()}"
+
             st.markdown(f"""
-            <div class="card-slate" style="text-align: center; padding: 18px; margin-bottom: 16px; border-style: dashed;">
-                <span style="color: #94a3b8; font-size: 13px;">No open bets matching <b>"{search_query}"</b>. Try adjusting your search query or sport filter.</span>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-            for _, p_bet in filtered_df.iterrows():
-                bid = int(p_bet["id"])
-                b_sport = str(p_bet["sport"]).upper()
-                b_matchup = str(p_bet["matchup"])
-                b_team = str(p_bet["team_selected"])
-                b_stake = float(p_bet["stake"])
-                b_odds = float(p_bet["odds"])
-                b_profit = round(b_stake * (b_odds - 1.0), 2)
-                b_payout = round(b_stake * b_odds, 2)
-                b_date = str(p_bet["placed_at"])
-
-                st.markdown(f"""
-                <div class="card-neutral" style="border-left: 4px solid #3b82f6; margin-bottom: 10px;">
+            <div class="open-bet-card" data-bet-id="{bid}" data-search="{search_str}">
+                <div class="card-neutral" style="border-left: 4px solid #3b82f6; margin-bottom: 8px;">
                     <div style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; margin-bottom: 8px;">
                         <div>
                             <span style="background-color: #1e3a8a; color: #93c5fd; font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 4px; text-transform: uppercase;">{b_sport}</span>
@@ -627,26 +636,91 @@ elif nav_selection == "Bankroll & Ledger":
                         <span style="color: #94a3b8;">(Payout: {config.DEFAULT_CURRENCY}{b_payout:,.2f})</span>
                     </div>
                 </div>
-                """, unsafe_allow_html=True)
+            </div>
+            """, unsafe_allow_html=True)
 
-                btn_c1, btn_c2, btn_c3 = st.columns([1.6, 1.6, 1.2])
-                with btn_c1:
-                    if st.button(f"Mark as Won (+{config.DEFAULT_CURRENCY}{b_profit:,.2f})", type="primary", key=f"res_win_{bid}"):
-                        BankrollLedger.resolve_simulation_bet(bid, is_win=True)
-                        st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as WON! +{config.DEFAULT_CURRENCY}{b_profit:,.2f} profit credited."
-                        st.rerun()
-                with btn_c2:
-                    if st.button(f"Mark as Lost (-{config.DEFAULT_CURRENCY}{b_stake:,.2f})", key=f"res_loss_{bid}"):
-                        BankrollLedger.resolve_simulation_bet(bid, is_win=False)
-                        st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as LOST. -{config.DEFAULT_CURRENCY}{b_stake:,.2f} deducted."
-                        st.rerun()
-                with btn_c3:
-                    if st.button("Cancel / Void", key=f"res_void_{bid}"):
-                        BankrollLedger.void_simulation_bet(bid)
-                        st.session_state["bet_notification"] = f"Bet #{bid} cancelled."
-                        st.rerun()
+            btn_c1, btn_c2, btn_c3 = st.columns([1.6, 1.6, 1.2])
+            with btn_c1:
+                if st.button(f"Mark as Won (+{config.DEFAULT_CURRENCY}{b_profit:,.2f})", type="primary", key=f"res_win_{bid}"):
+                    BankrollLedger.resolve_simulation_bet(bid, is_win=True)
+                    st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as WON! +{config.DEFAULT_CURRENCY}{b_profit:,.2f} profit credited."
+                    st.rerun()
+            with btn_c2:
+                if st.button(f"Mark as Lost (-{config.DEFAULT_CURRENCY}{b_stake:,.2f})", key=f"res_loss_{bid}"):
+                    BankrollLedger.resolve_simulation_bet(bid, is_win=False)
+                    st.session_state["bet_notification"] = f"Bet #{bid} on {b_team} marked as LOST. -{config.DEFAULT_CURRENCY}{b_stake:,.2f} deducted."
+                    st.rerun()
+            with btn_c3:
+                if st.button("Cancel / Void", key=f"res_void_{bid}"):
+                    BankrollLedger.void_simulation_bet(bid)
+                    st.session_state["bet_notification"] = f"Bet #{bid} cancelled."
+                    st.rerun()
 
-                st.markdown("<hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'>", unsafe_allow_html=True)
+            st.markdown(f"<div class='open-bet-divider' data-bet-id='{bid}'><hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+        # Inject Instant JavaScript Search Engine
+        st.markdown("""
+        <script>
+        (function() {
+            function runFilter() {
+                var searchInput = document.getElementById('live-open-bets-search-input');
+                if (!searchInput) return;
+                var rawVal = searchInput.value || '';
+                var query = rawVal.toLowerCase().trim().replace(/^#/, '');
+                var cards = document.querySelectorAll('.open-bet-card');
+                var visibleCount = 0;
+
+                cards.forEach(function(card) {
+                    var bid = card.getAttribute('data-bet-id');
+                    var searchData = (card.getAttribute('data-search') || '').toLowerCase();
+                    var isMatch = !query || searchData.indexOf(query) !== -1;
+
+                    card.style.display = isMatch ? '' : 'none';
+
+                    var btn = document.querySelector('button[data-testid*="res_win_' + bid + '"], [key="res_win_' + bid + '"]');
+                    if (btn) {
+                        var btnRow = btn.closest('[data-testid="stHorizontalBlock"]') || btn.closest('.stHorizontalBlock') || btn.parentElement.parentElement;
+                        if (btnRow) {
+                            btnRow.style.display = isMatch ? '' : 'none';
+                        }
+                    }
+
+                    var divider = document.querySelector('.open-bet-divider[data-bet-id="' + bid + '"]');
+                    if (divider) {
+                        divider.style.display = isMatch ? '' : 'none';
+                    }
+
+                    if (isMatch) visibleCount++;
+                });
+
+                var badge = document.getElementById('open-bets-header-count');
+                if (badge) {
+                    if (!query) {
+                        badge.innerText = 'Open Bets (' + cards.length + ')';
+                    } else {
+                        badge.innerText = 'Open Bets (' + visibleCount + ' of ' + cards.length + ' matching)';
+                    }
+                }
+
+                var noMatch = document.getElementById('live-no-matches-box');
+                if (noMatch) {
+                    noMatch.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
+                    var querySpan = document.getElementById('live-search-query-display');
+                    if (querySpan) querySpan.innerText = rawVal;
+                }
+            }
+
+            window.runLiveBetSearch = runFilter;
+
+            var inputEl = document.getElementById('live-open-bets-search-input');
+            if (inputEl) {
+                inputEl.addEventListener('input', runFilter);
+                inputEl.addEventListener('keyup', runFilter);
+            }
+            setTimeout(runFilter, 50);
+        })();
+        </script>
+        """, unsafe_allow_html=True)
 
     metrics = BankrollLedger.get_ledger_metrics()
 
