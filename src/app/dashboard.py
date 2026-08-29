@@ -15,7 +15,12 @@ if str(ROOT_DIR) not in sys.path:
 import config
 from src.db.database import db
 from src.ingestion.pipeline import generate_seed_dataset_if_empty
-from src.ingestion.mlb_api_fetcher import generate_mlb_seed_dataset_if_empty
+try:
+    from src.ingestion.mlb_api_fetcher import generate_mlb_seed_dataset_if_empty, sync_live_mlb_season
+except (ImportError, AttributeError):
+    from src.ingestion.mlb_api_fetcher import generate_mlb_seed_dataset_if_empty
+    def sync_live_mlb_season(*args, **kwargs):
+        return generate_mlb_seed_dataset_if_empty(force_refresh=True)
 from src.models.margin_model import MarginPredictor
 from src.models.totals_model import TotalsPredictor
 from src.models.win_prob_model import WinProbabilityModel
@@ -908,7 +913,6 @@ elif nav_selection == "Data & Settings":
                 
                 if "MLB" in update_target or "All" in update_target:
                     st.write("4. Syncing MLB live completed games, starting rotations, and sabermetrics...")
-                    from src.ingestion.mlb_api_fetcher import sync_live_mlb_season
                     sync_live_mlb_season()
                     st.write("5. Retraining MLB run margin & win probability models on latest data...")
                     train_all_models(sport="mlb")

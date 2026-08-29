@@ -1,4 +1,4 @@
-﻿from src.ingestion.nba_api_fetcher import fetch_season_game_logs, fetch_scoreboard_for_date
-from src.ingestion.mlb_api_fetcher import fetch_mlb_season_schedule, generate_mlb_seed_dataset_if_empty
+from src.ingestion.nba_api_fetcher import fetch_season_game_logs, fetch_scoreboard_for_date
+from src.ingestion.mlb_api_fetcher import fetch_mlb_season_schedule, generate_mlb_seed_dataset_if_empty, sync_live_mlb_season
 from src.ingestion.odds_fetcher import fetch_live_odds_the_odds_api, parse_the_odds_api_response, generate_synthetic_odds_for_historical_games
 from src.ingestion.pipeline import sync_season, process_and_store_season_data, generate_seed_dataset_if_empty
