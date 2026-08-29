@@ -10,9 +10,9 @@ class BankrollLedger:
     """
 
     @staticmethod
-    def get_current_balance() -> float:
+    def get_settled_balance() -> float:
         """
-        Returns the latest bankroll balance.
+        Returns the settled bankroll balance from closed transactions.
         If no transactions exist, attempts auto-restoring from sync snapshot before initializing with DEFAULT_STARTING_BANKROLL.
         """
         row = db.fetch_one("SELECT balance_after FROM bankroll_transactions ORDER BY id DESC LIMIT 1")
@@ -39,6 +39,25 @@ class BankrollLedger:
             """, (stored_init, stored_init))
         return stored_init
 
+    @staticmethod
+    def get_pending_stakes_total() -> float:
+        """
+        Returns the total sum of stakes currently at risk across all active/pending simulation wagers.
+        """
+        row = db.fetch_one("SELECT COALESCE(SUM(stake), 0.0) as total FROM simulation_bets WHERE status = 'PENDING'")
+        return round(float(row["total"]), 2) if row else 0.0
+
+    @staticmethod
+    def get_current_balance(include_pending_deduction: bool = True) -> float:
+        """
+        Returns the current available bankroll balance.
+        Deducts active bets currently at risk when include_pending_deduction=True.
+        """
+        settled = BankrollLedger.get_settled_balance()
+        if not include_pending_deduction:
+            return settled
+        pending = BankrollLedger.get_pending_stakes_total()
+        return round(max(settled - pending, 0.0), 2)
 
     @staticmethod
     def deposit(amount: float, note: str = "Deposit") -> float:
@@ -46,7 +65,7 @@ class BankrollLedger:
         Adds funds to user bankroll.
         """
         amount = round(abs(float(amount)), 2)
-        curr = BankrollLedger.get_current_balance()
+        curr = BankrollLedger.get_settled_balance()
         new_bal = round(curr + amount, 2)
 
         with db.get_connection() as conn:
@@ -55,7 +74,7 @@ class BankrollLedger:
                 INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
                 VALUES ('DEPOSIT', ?, ?, 'general', ?)
             """, (amount, new_bal, note or "Deposit"))
-        return new_bal
+        return BankrollLedger.get_current_balance()
 
     @staticmethod
     def withdraw(amount: float, note: str = "Withdrawal") -> float:
@@ -63,7 +82,7 @@ class BankrollLedger:
         Deducts withdrawn funds from user bankroll.
         """
         amount = round(abs(float(amount)), 2)
-        curr = BankrollLedger.get_current_balance()
+        curr = BankrollLedger.get_settled_balance()
         new_bal = round(max(curr - amount, 0.0), 2)
 
         with db.get_connection() as conn:
@@ -72,7 +91,7 @@ class BankrollLedger:
                 INSERT INTO bankroll_transactions (tx_type, amount, balance_after, sport, note)
                 VALUES ('WITHDRAWAL', ?, ?, 'general', ?)
             """, (-amount, new_bal, note or "Withdrawal"))
-        return new_bal
+        return BankrollLedger.get_current_balance()
 
     @staticmethod
     def record_bet(sport: str, team: str, stake: float, odds: float, is_win: bool, note: str = "") -> Dict:
@@ -81,7 +100,7 @@ class BankrollLedger:
         """
         stake = round(abs(float(stake)), 2)
         odds = round(float(odds), 2)
-        curr = BankrollLedger.get_current_balance()
+        curr = BankrollLedger.get_settled_balance()
 
         if is_win:
             pnl = round(stake * (odds - 1.0), 2)
@@ -184,10 +203,19 @@ class BankrollLedger:
         """
         df = db.fetch_df("SELECT * FROM bankroll_transactions ORDER BY id ASC")
         stored_init = float(db.get_setting("starting_bankroll", str(config.DEFAULT_STARTING_BANKROLL)))
+        pending_stakes = BankrollLedger.get_pending_stakes_total()
+        pending_row = db.fetch_one("SELECT COUNT(*) as c FROM simulation_bets WHERE status = 'PENDING'")
+        pending_count = int(pending_row["c"]) if pending_row else 0
+
         if df.empty:
             curr = BankrollLedger.get_current_balance()
+            settled = BankrollLedger.get_settled_balance()
             return {
                 "current_balance": curr,
+                "available_balance": curr,
+                "settled_balance": settled,
+                "pending_stakes": pending_stakes,
+                "pending_bets_count": pending_count,
                 "initial_balance": stored_init,
                 "total_deposits": 0.0,
                 "total_withdrawals": 0.0,
@@ -205,7 +233,8 @@ class BankrollLedger:
 
         init_row = df[df["tx_type"] == "INITIAL"]
         initial_bal = float(init_row.iloc[0]["amount"]) if not init_row.empty else stored_init
-        curr_bal = float(df.iloc[-1]["balance_after"])
+        settled_bal = float(df.iloc[-1]["balance_after"])
+        available_bal = round(max(settled_bal - pending_stakes, 0.0), 2)
 
         deposits = float(df[df["tx_type"] == "DEPOSIT"]["amount"].sum())
         withdrawals = float(abs(df[df["tx_type"] == "WITHDRAWAL"]["amount"].sum()))
@@ -227,7 +256,11 @@ class BankrollLedger:
         yield_pct = round((net_betting_pnl / total_staked) * 100.0, 2) if total_staked > 0 else 0.0
 
         return {
-            "current_balance": curr_bal,
+            "current_balance": available_bal,
+            "available_balance": available_bal,
+            "settled_balance": settled_bal,
+            "pending_stakes": pending_stakes,
+            "pending_bets_count": pending_count,
             "initial_balance": initial_bal,
             "total_deposits": deposits,
             "total_withdrawals": withdrawals,

@@ -80,12 +80,16 @@ def test_simulation_betting_lifecycle():
     # Check pending
     pending_df = BankrollLedger.get_pending_simulation_bets()
     assert len(pending_df) == 2
+    assert BankrollLedger.get_pending_stakes_total() == 90.0
+    assert BankrollLedger.get_current_balance() == 1110.0 # 1200 - 90
+    assert BankrollLedger.get_settled_balance() == 1200.0
 
     # 2. Resolve bet1 as WON (+₱55 profit)
     res1 = BankrollLedger.resolve_simulation_bet(bet_id1, is_win=True)
     assert res1["status"] == "WON"
     assert res1["pnl"] == 55.0
-    assert BankrollLedger.get_current_balance() == 1255.0
+    assert BankrollLedger.get_settled_balance() == 1255.0
+    assert BankrollLedger.get_current_balance() == 1215.0 # 1255 - 40 pending
 
     # Check pending again
     pending_df2 = BankrollLedger.get_pending_simulation_bets()
@@ -96,7 +100,8 @@ def test_simulation_betting_lifecycle():
     res2 = BankrollLedger.resolve_simulation_bet(bet_id2, is_win=False)
     assert res2["status"] == "LOST"
     assert res2["pnl"] == -40.0
-    assert BankrollLedger.get_current_balance() == 1215.0
+    assert BankrollLedger.get_settled_balance() == 1215.0
+    assert BankrollLedger.get_current_balance() == 1215.0 # 1215 - 0 pending
 
     # 4. Check no pending bets left
     pending_df3 = BankrollLedger.get_pending_simulation_bets()
@@ -110,7 +115,9 @@ def test_simulation_betting_lifecycle():
         stake=30.0,
         odds=1.90
     )
+    assert BankrollLedger.get_current_balance() == 1185.0 # 1215 - 30
     assert BankrollLedger.void_simulation_bet(bet_id3) is True
+    assert BankrollLedger.get_current_balance() == 1215.0 # Released back to 1215
     assert len(BankrollLedger.get_pending_simulation_bets()) == 0
 
     # Cleanup

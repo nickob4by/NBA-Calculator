@@ -164,6 +164,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 
 live_ledger_balance = BankrollLedger.get_current_balance()
+settled_ledger_balance = BankrollLedger.get_settled_balance()
+pending_stakes_total = BankrollLedger.get_pending_stakes_total()
 active_bankroll = live_ledger_balance
 kelly_mult = st.session_state["kelly_mult"]
 min_edge_pct = st.session_state["min_edge_pct"]
@@ -176,12 +178,23 @@ with head_c1:
     st.caption("NBA & MLB Statistical Valuation Engine")
 
 with head_c2:
-    st.markdown(f"""
-    <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; text-align: center;">
-        <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Balance: </span>
-        <span style="font-size: 16px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</span>
-    </div>
-    """, unsafe_allow_html=True)
+    if pending_stakes_total > 0:
+        st.markdown(f"""
+        <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 6px 12px; text-align: center;">
+            <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Available: </span>
+            <span style="font-size: 15px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{live_ledger_balance:,.2f}</span>
+            <div style="font-size: 11px; color: #f59e0b; margin-top: 1px;">
+                <span>In-Play: {config.DEFAULT_CURRENCY}{pending_stakes_total:,.2f}</span>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
+    else:
+        st.markdown(f"""
+        <div style="background-color: #111827; border: 1px solid #1f2937; border-radius: 8px; padding: 8px 12px; text-align: center;">
+            <span style="font-size: 11px; color: #9ca3af; text-transform: uppercase;">Balance: </span>
+            <span style="font-size: 16px; font-weight: bold; color: #10b981;">{config.DEFAULT_CURRENCY}{active_bankroll:,.2f}</span>
+        </div>
+        """, unsafe_allow_html=True)
 
 # Top Horizontal Navigation Tabs
 nav_selection = st.radio(
@@ -572,11 +585,11 @@ elif nav_selection == "Bankroll & Ledger":
 
     # Summary Metrics (Auto wrap on mobile)
     m1, m2, m3, m4, m5 = st.columns(5)
-    m1.metric("Current Balance", f"{config.DEFAULT_CURRENCY}{metrics['current_balance']:,.2f}")
-    m2.metric("Net Betting PnL", f"{config.DEFAULT_CURRENCY}{metrics['net_betting_pnl']:+,.2f}")
-    m3.metric("Total Staked", f"{config.DEFAULT_CURRENCY}{metrics['total_staked']:,.2f}")
-    m4.metric("Total Deposits", f"{config.DEFAULT_CURRENCY}{metrics['total_deposits']:,.2f}")
-    m5.metric("Total Withdrawals", f"{config.DEFAULT_CURRENCY}{metrics['total_withdrawals']:,.2f}")
+    m1.metric("Available Balance", f"{config.DEFAULT_CURRENCY}{metrics['available_balance']:,.2f}", help="Cash available for new bets (Settled Balance minus Active Wagers).")
+    m2.metric("In-Play (Active Bets)", f"{config.DEFAULT_CURRENCY}{metrics['pending_stakes']:,.2f}", help=f"Total stakes currently at risk across {metrics['pending_bets_count']} active pending wagers.")
+    m3.metric("Settled Equity", f"{config.DEFAULT_CURRENCY}{metrics['settled_balance']:,.2f}", help="Total bankroll balance from all settled bets, deposits, and initial capital.")
+    m4.metric("Net Betting PnL", f"{config.DEFAULT_CURRENCY}{metrics['net_betting_pnl']:+,.2f}")
+    m5.metric("Total Staked (Settled)", f"{config.DEFAULT_CURRENCY}{metrics['total_staked']:,.2f}")
 
     m6, m7, m8, m9, m10 = st.columns(5)
     m6.metric("Total Bets Settled", f"{metrics['total_bets']}")
