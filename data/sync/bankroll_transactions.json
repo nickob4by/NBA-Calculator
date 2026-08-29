@@ -22,5 +22,77 @@
     "team_selected": "Cincinnati Reds",
     "note": "Sim Bet #59: Chicago Cubs vs Cincinnati Reds (Cincinnati Reds)",
     "created_at": "2026-08-29 00:37:43"
+  },
+  {
+    "id": 200,
+    "tx_type": "BET_LOSS",
+    "amount": -4.0,
+    "balance_after": 99.02,
+    "sport": "mlb",
+    "stake": 4.0,
+    "odds": 2.75,
+    "team_selected": "Detroit Tigers",
+    "note": "Sim Bet #60: Detroit Tigers vs Los Angeles Dodgers (Detroit Tigers)",
+    "created_at": "2026-08-29 02:00:05"
+  },
+  {
+    "id": 201,
+    "tx_type": "BET_WIN",
+    "amount": 4.96,
+    "balance_after": 103.98,
+    "sport": "mlb",
+    "stake": 4.0,
+    "odds": 2.24,
+    "team_selected": "Washington Nationals",
+    "note": "Sim Bet #61: Washington Nationals vs Miami Marlins (Washington Nationals)",
+    "created_at": "2026-08-29 02:00:17"
+  },
+  {
+    "id": 202,
+    "tx_type": "BET_WIN",
+    "amount": 2.92,
+    "balance_after": 106.9,
+    "sport": "mlb",
+    "stake": 4.0,
+    "odds": 1.73,
+    "team_selected": "Tampa Bay Rays",
+    "note": "Sim Bet #66: Tampa Bay Rays vs San Diego Padres (Tampa Bay Rays)",
+    "created_at": "2026-08-29 02:00:35"
+  },
+  {
+    "id": 203,
+    "tx_type": "BET_WIN",
+    "amount": 2.28,
+    "balance_after": 109.18,
+    "sport": "mlb",
+    "stake": 4.0,
+    "odds": 1.57,
+    "team_selected": "Toronto Blue Jays",
+    "note": "Sim Bet #69: Toronto Blue Jays vs Seattle Mariners (Toronto Blue Jays)",
+    "created_at": "2026-08-29 02:00:47"
+  },
+  {
+    "id": 204,
+    "tx_type": "BET_LOSS",
+    "amount": -3.64,
+    "balance_after": 105.54,
+    "sport": "mlb",
+    "stake": 3.64,
+    "odds": 2.04,
+    "team_selected": "New York Mets",
+    "note": "Sim Bet #64: New York Mets vs Houston Astros (New York Mets)",
+    "created_at": "2026-08-29 02:01:28"
+  },
+  {
+    "id": 205,
+    "tx_type": "BET_LOSS",
+    "amount": -4.0,
+    "balance_after": 101.54,
+    "sport": "mlb",
+    "stake": 4.0,
+    "odds": 1.71,
+    "team_selected": "Cleveland Guardians",
+    "note": "Sim Bet #65: Cleveland Guardians vs Kansas City Royals (Cleveland Guardians)",
+    "created_at": "2026-08-29 02:01:48"
   }
 ]

@@ -173,10 +173,10 @@
     "odds": 2.75,
     "model_prob": 0.7098,
     "edge_pct": 0.3661,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "LOST",
+    "pnl": -4.0,
     "placed_at": "2026-08-28 09:11:28",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:00:05",
     "note": ""
   },
   {
@@ -188,10 +188,10 @@
     "odds": 2.24,
     "model_prob": 0.6566,
     "edge_pct": 0.2354,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "WON",
+    "pnl": 4.96,
     "placed_at": "2026-08-28 09:12:14",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:00:17",
     "note": ""
   },
   {
@@ -233,10 +233,10 @@
     "odds": 2.04,
     "model_prob": 0.5831,
     "edge_pct": 0.1199,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "LOST",
+    "pnl": -3.64,
     "placed_at": "2026-08-28 09:22:33",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:01:28",
     "note": ""
   },
   {
@@ -248,10 +248,10 @@
     "odds": 1.71,
     "model_prob": 0.7819,
     "edge_pct": 0.2295,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "LOST",
+    "pnl": -4.0,
     "placed_at": "2026-08-28 09:23:00",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:01:48",
     "note": ""
   },
   {
@@ -263,10 +263,10 @@
     "odds": 1.73,
     "model_prob": 0.7313,
     "edge_pct": 0.1853,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "WON",
+    "pnl": 2.92,
     "placed_at": "2026-08-28 09:23:22",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:00:35",
     "note": ""
   },
   {
@@ -308,10 +308,10 @@
     "odds": 1.57,
     "model_prob": 0.7491,
     "edge_pct": 0.1496,
-    "status": "PENDING",
-    "pnl": 0.0,
+    "status": "WON",
+    "pnl": 2.28,
     "placed_at": "2026-08-28 09:24:32",
-    "resolved_at": NaN,
+    "resolved_at": "2026-08-29 02:00:47",
     "note": ""
   },
   {
