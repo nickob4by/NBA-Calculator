@@ -197,7 +197,10 @@ class BankrollLedger:
                 "win_rate": 0.0,
                 "total_staked": 0.0,
                 "net_betting_pnl": 0.0,
-                "roi_pct": 0.0
+                "roi_pct": 0.0,
+                "bankroll_roi_pct": 0.0,
+                "yield_pct": 0.0,
+                "turnover_roi_pct": 0.0
             }
 
         init_row = df[df["tx_type"] == "INITIAL"]
@@ -215,7 +218,13 @@ class BankrollLedger:
 
         total_staked = float(bets_df["stake"].sum())
         net_betting_pnl = float(bets_df["amount"].sum())
-        roi_pct = round((net_betting_pnl / total_staked) * 100.0, 2) if total_staked > 0 else 0.0
+
+        # 1. Bankroll ROI (Capital Growth %): Net PnL / (Starting Capital + Deposits)
+        invested_capital = max(initial_bal + deposits, 1.0)
+        bankroll_roi_pct = round((net_betting_pnl / invested_capital) * 100.0, 2)
+
+        # 2. Betting Yield (Turnover ROI %): Net PnL / Total Staked Turnover
+        yield_pct = round((net_betting_pnl / total_staked) * 100.0, 2) if total_staked > 0 else 0.0
 
         return {
             "current_balance": curr_bal,
@@ -228,7 +237,10 @@ class BankrollLedger:
             "win_rate": win_rate,
             "total_staked": total_staked,
             "net_betting_pnl": net_betting_pnl,
-            "roi_pct": roi_pct
+            "roi_pct": bankroll_roi_pct,
+            "bankroll_roi_pct": bankroll_roi_pct,
+            "yield_pct": yield_pct,
+            "turnover_roi_pct": yield_pct
         }
 
     # ================= SIMULATION BETTING LIFECYCLE =================

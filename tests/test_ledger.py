@@ -35,6 +35,8 @@ def test_ledger_flow():
     assert metrics["win_rate"] == 50.0
     assert metrics["total_staked"] == 100.0
     assert metrics["net_betting_pnl"] == 0.0
+    assert metrics["bankroll_roi_pct"] == 0.0
+    assert metrics["yield_pct"] == 0.0
 
     # 7. Test set_starting_balance adjustment
     # Starting balance was 1200, balance was 1500 (with +300 deposit-withdraw).

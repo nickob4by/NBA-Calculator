@@ -571,17 +571,19 @@ elif nav_selection == "Bankroll & Ledger":
     metrics = BankrollLedger.get_ledger_metrics()
 
     # Summary Metrics (Auto wrap on mobile)
-    m1, m2, m3, m4 = st.columns(4)
+    m1, m2, m3, m4, m5 = st.columns(5)
     m1.metric("Current Balance", f"{config.DEFAULT_CURRENCY}{metrics['current_balance']:,.2f}")
     m2.metric("Net Betting PnL", f"{config.DEFAULT_CURRENCY}{metrics['net_betting_pnl']:+,.2f}")
-    m3.metric("Total Deposits", f"{config.DEFAULT_CURRENCY}{metrics['total_deposits']:,.2f}")
-    m4.metric("Total Withdrawals", f"{config.DEFAULT_CURRENCY}{metrics['total_withdrawals']:,.2f}")
+    m3.metric("Total Staked", f"{config.DEFAULT_CURRENCY}{metrics['total_staked']:,.2f}")
+    m4.metric("Total Deposits", f"{config.DEFAULT_CURRENCY}{metrics['total_deposits']:,.2f}")
+    m5.metric("Total Withdrawals", f"{config.DEFAULT_CURRENCY}{metrics['total_withdrawals']:,.2f}")
 
-    m5, m6, m7, m8 = st.columns(4)
-    m5.metric("Total Bets Settled", f"{metrics['total_bets']}")
-    m6.metric("Record (W - L)", f"{metrics['wins']}W - {metrics['losses']}L")
-    m7.metric("Win Rate", f"{metrics['win_rate']:.1f}%")
-    m8.metric("All-Time ROI", f"{metrics['roi_pct']:+.2f}%")
+    m6, m7, m8, m9, m10 = st.columns(5)
+    m6.metric("Total Bets Settled", f"{metrics['total_bets']}")
+    m7.metric("Record (W - L)", f"{metrics['wins']}W - {metrics['losses']}L")
+    m8.metric("Win Rate", f"{metrics['win_rate']:.1f}%")
+    m9.metric("Bankroll ROI", f"{metrics['bankroll_roi_pct']:+.2f}%", help="Capital Return on Investment: Net PnL / (Starting Capital + Deposits).")
+    m10.metric("Betting Yield", f"{metrics['yield_pct']:+.2f}%", help="Return on Turnover: Net PnL / Total Staked volume on settled wagers.")
 
     st.markdown("---")
 
