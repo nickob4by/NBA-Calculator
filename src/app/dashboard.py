@@ -2,6 +2,7 @@ import sys
 import json
 from pathlib import Path
 import streamlit as st
+import streamlit.components.v1 as components
 import pandas as pd
 import numpy as np
 import plotly.express as px
@@ -540,96 +541,12 @@ elif nav_selection == "Bankroll & Ledger":
         # Search, Sport Filter & Sorter Controls
         s_col1, s_col2, s_col3 = st.columns([2.4, 1.2, 1.4])
         with s_col1:
-            st.markdown("""
-            <div style="position: relative; width: 100%; margin-bottom: 8px;">
-                <input 
-                    type="text" 
-                    id="live-open-bets-search-input" 
-                    placeholder="🔍 Type to search (e.g. Tigers, Boston, #63)..." 
-                    autocomplete="off"
-                    style="
-                        width: 100%; 
-                        padding: 9px 36px 9px 12px; 
-                        background-color: #0f172a; 
-                        color: #f8fafc; 
-                        border: 1px solid #334155; 
-                        border-radius: 8px; 
-                        font-size: 14px; 
-                        outline: none; 
-                        box-sizing: border-box;
-                        transition: border-color 0.15s ease-in-out;
-                    "
-                    onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 1px #38bdf8';"
-                    onblur="this.style.borderColor='#334155'; this.style.boxShadow='none';"
-                    oninput="(function(inp){
-                        var raw = (inp.value || '').trim();
-                        var q = raw.toLowerCase().replace(/^#/, '');
-                        var root = inp.closest('.main') || document;
-                        var cards = root.querySelectorAll('.open-bet-card');
-                        var matchCount = 0;
-                        cards.forEach(function(card){
-                            var str = (card.getAttribute('data-search') || '').toLowerCase();
-                            var match = !q || str.indexOf(q) !== -1;
-                            
-                            var container = card.closest('[data-testid=\\'element-container\\']') || card.parentElement;
-                            if (container) container.style.display = match ? '' : 'none';
-                            card.style.display = match ? '' : 'none';
-                            
-                            var btnContainer = container ? container.nextElementSibling : null;
-                            if (btnContainer) btnContainer.style.display = match ? '' : 'none';
-                            
-                            var divContainer = btnContainer ? btnContainer.nextElementSibling : null;
-                            if (divContainer) divContainer.style.display = match ? '' : 'none';
-                            
-                            if (match) matchCount++;
-                        });
-                        
-                        var badge = root.querySelector('#open-bets-header-count');
-                        if (badge) {
-                            if (!q) {
-                                badge.innerText = 'Open Bets (' + cards.length + ')';
-                            } else {
-                                badge.innerText = 'Open Bets (' + matchCount + ' of ' + cards.length + ' matching)';
-                            }
-                        }
-                        
-                        var noMatch = root.querySelector('#live-no-matches-box');
-                        if (noMatch) {
-                            noMatch.style.display = (matchCount === 0 && cards.length > 0) ? 'block' : 'none';
-                            var qSpan = root.querySelector('#live-search-query-display');
-                            if (qSpan) qSpan.innerText = raw;
-                        }
-                    })(this);"
-                />
-                <span 
-                    id="clear-search-btn"
-                    onclick="(function(){
-                        var el = document.getElementById('live-open-bets-search-input');
-                        if (el) {
-                            el.value = '';
-                            el.dispatchEvent(new Event('input', { bubbles: true }));
-                            el.focus();
-                        }
-                    })();"
-                    style="
-                        position: absolute; 
-                        right: 12px; 
-                        top: 50%; 
-                        transform: translateY(-50%); 
-                        color: #94a3b8; 
-                        cursor: pointer; 
-                        font-size: 16px;
-                        user-select: none;
-                        display: inline-block;
-                    "
-                    title="Clear search"
-                >✕</span>
-            </div>
-            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onload="(function(){
-                var el = document.getElementById('live-open-bets-search-input');
-                if (el && el.value) el.dispatchEvent(new Event('input', { bubbles: true }));
-            })();" />
-            """, unsafe_allow_html=True)
+            search_query = st.text_input(
+                "Search Open Bets",
+                placeholder="🔍 Search by team, matchup, sport, ID (e.g. Tigers, #63)...",
+                label_visibility="collapsed",
+                key="search_open_bets_box"
+            )
             
         with s_col2:
             filter_sport = st.selectbox(
@@ -658,6 +575,16 @@ elif nav_selection == "Bankroll & Ledger":
         filtered_df = pending_df.copy()
         if filter_sport != "All Sports":
             filtered_df = filtered_df[filtered_df["sport"].str.upper() == filter_sport]
+
+        # Apply Search Query (Python Fallback)
+        if search_query.strip():
+            q = search_query.strip().lower().lstrip("#")
+            filtered_df = filtered_df[
+                filtered_df["team_selected"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["matchup"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["sport"].astype(str).str.lower().str.contains(q, na=False) |
+                filtered_df["id"].astype(str).str.contains(q, na=False)
+            ]
 
         # Apply Sorter
         if sort_by == "Newest First":
@@ -736,6 +663,71 @@ elif nav_selection == "Bankroll & Ledger":
                     st.rerun()
 
             st.markdown(f"<div class='open-bet-divider' data-bet-id='{bid}'><hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'></div>", unsafe_allow_html=True)
+
+        components.html("""
+        <script>
+        (function() {
+            var doc = window.parent.document;
+            if (!doc) return;
+            
+            function initSearch() {
+                var input = doc.querySelector('input[aria-label="Search Open Bets"]') ||
+                            doc.querySelector('input[placeholder*="Search by team"]');
+                if (!input) {
+                    setTimeout(initSearch, 200);
+                    return;
+                }
+                
+                function runInstant() {
+                    var val = (input.value || '').trim().toLowerCase().replace(/^#/, '');
+                    var cards = doc.querySelectorAll('.open-bet-card');
+                    var count = 0;
+                    
+                    cards.forEach(function(card) {
+                        var s = (card.getAttribute('data-search') || '').toLowerCase();
+                        var match = !val || s.indexOf(val) !== -1;
+                        
+                        var container = card.closest('[data-testid="element-container"]') || card.parentElement;
+                        if (container) {
+                            container.style.display = match ? '' : 'none';
+                            var btnRow = container.nextElementSibling;
+                            if (btnRow) btnRow.style.display = match ? '' : 'none';
+                            var divRow = btnRow ? btnRow.nextElementSibling : null;
+                            if (divRow) divRow.style.display = match ? '' : 'none';
+                        }
+                        if (match) count++;
+                    });
+                    
+                    var badge = doc.querySelector('#open-bets-header-count');
+                    if (badge) {
+                        if (!val) {
+                            badge.innerText = 'Open Bets (' + cards.length + ')';
+                        } else {
+                            badge.innerText = 'Open Bets (' + count + ' of ' + cards.length + ' matching)';
+                        }
+                    }
+                    
+                    var noMatch = doc.querySelector('#live-no-matches-box');
+                    if (noMatch) {
+                        noMatch.style.display = (count === 0 && cards.length > 0) ? 'block' : 'none';
+                        var qSpan = doc.querySelector('#live-search-query-display');
+                        if (qSpan) qSpan.innerText = input.value;
+                    }
+                }
+                
+                input.removeEventListener('input', runInstant);
+                input.addEventListener('input', runInstant);
+                input.removeEventListener('keyup', runInstant);
+                input.addEventListener('keyup', runInstant);
+                
+                if (input.value) runInstant();
+            }
+            
+            initSearch();
+            setTimeout(initSearch, 300);
+        })();
+        </script>
+        """, height=0, width=0)
 
     metrics = BankrollLedger.get_ledger_metrics()
 
