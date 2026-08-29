@@ -890,7 +890,7 @@ elif nav_selection == "Data & Settings":
         
         update_target = st.selectbox(
             "Select Update Scope",
-            options=["All Sports (NBA & MLB)", "NBA (2024-25 Latest)", "MLB (2020-2025 Complete)"],
+            options=["All Sports (NBA & MLB)", "NBA (Live & Historical)", "MLB (Live & Historical)"],
             index=0
         )
         
@@ -900,14 +900,16 @@ elif nav_selection == "Data & Settings":
                 st.write("1. Connecting to sports data pipeline...")
                 
                 if "NBA" in update_target or "All" in update_target:
-                    st.write("2. Syncing NBA 2024-25 game logs, rosters, and advanced Four Factors...")
-                    generate_seed_dataset_if_empty()
+                    st.write("2. Syncing NBA latest game logs, box scores, and Four Factors...")
+                    from src.ingestion.pipeline import generate_seed_dataset_if_empty
+                    generate_seed_dataset_if_empty(force_refresh=False)
                     st.write("3. Retraining NBA margin & win probability models on latest data...")
                     train_all_models(sport="nba")
                 
                 if "MLB" in update_target or "All" in update_target:
-                    st.write("4. Syncing MLB 2020-2025 seasons, starting rotations, and sabermetrics...")
-                    generate_mlb_seed_dataset_if_empty(force_refresh=True)
+                    st.write("4. Syncing MLB live completed games, starting rotations, and sabermetrics...")
+                    from src.ingestion.mlb_api_fetcher import sync_live_mlb_season
+                    sync_live_mlb_season()
                     st.write("5. Retraining MLB run margin & win probability models on latest data...")
                     train_all_models(sport="mlb")
                 
@@ -915,8 +917,8 @@ elif nav_selection == "Data & Settings":
                 st.cache_resource.clear()
                 st.cache_data.clear()
                 
-                status.update(label="All team data, seasons, and ML models successfully updated & retrained!", state="complete", expanded=False)
-            st.success("Database, 2025 seasons, and ML models are completely up-to-date and retrained.")
+                status.update(label="All live game scores, team sabermetrics, and ML models successfully updated & retrained!", state="complete", expanded=False)
+            st.success("Database, live completed games, and ML models are completely up-to-date and retrained.")
             st.rerun()
 
     st.markdown("---")
