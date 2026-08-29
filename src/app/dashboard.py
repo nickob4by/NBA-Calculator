@@ -715,9 +715,13 @@ elif nav_selection == "Bankroll & Ledger":
                         st.success(f"Deposited {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
                         st.rerun()
                     else:
-                        bal = BankrollLedger.withdraw(f_amt, f_fund_note)
-                        st.success(f"Withdrawn {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
-                        st.rerun()
+                        avail = metrics["available_balance"]
+                        if f_amt > avail:
+                            st.error(f"Cannot withdraw {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available balance is {config.DEFAULT_CURRENCY}{avail:,.2f}.")
+                        else:
+                            bal = BankrollLedger.withdraw(f_amt, f_fund_note)
+                            st.success(f"Withdrawn {config.DEFAULT_CURRENCY}{f_amt:,.2f}. Available Balance: {config.DEFAULT_CURRENCY}{bal:,.2f}")
+                            st.rerun()
 
     with act_col2:
         with st.expander("Set Starting Capital", expanded=False):
