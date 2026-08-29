@@ -561,11 +561,56 @@ elif nav_selection == "Bankroll & Ledger":
                     "
                     onfocus="this.style.borderColor='#38bdf8'; this.style.boxShadow='0 0 0 1px #38bdf8';"
                     onblur="this.style.borderColor='#334155'; this.style.boxShadow='none';"
-                    oninput="window.runLiveBetSearch ? window.runLiveBetSearch() : null;"
+                    oninput="(function(inp){
+                        var raw = (inp.value || '').trim();
+                        var q = raw.toLowerCase().replace(/^#/, '');
+                        var root = inp.closest('.main') || document;
+                        var cards = root.querySelectorAll('.open-bet-card');
+                        var matchCount = 0;
+                        cards.forEach(function(card){
+                            var str = (card.getAttribute('data-search') || '').toLowerCase();
+                            var match = !q || str.indexOf(q) !== -1;
+                            
+                            var container = card.closest('[data-testid=\\'element-container\\']') || card.parentElement;
+                            if (container) container.style.display = match ? '' : 'none';
+                            card.style.display = match ? '' : 'none';
+                            
+                            var btnContainer = container ? container.nextElementSibling : null;
+                            if (btnContainer) btnContainer.style.display = match ? '' : 'none';
+                            
+                            var divContainer = btnContainer ? btnContainer.nextElementSibling : null;
+                            if (divContainer) divContainer.style.display = match ? '' : 'none';
+                            
+                            if (match) matchCount++;
+                        });
+                        
+                        var badge = root.querySelector('#open-bets-header-count');
+                        if (badge) {
+                            if (!q) {
+                                badge.innerText = 'Open Bets (' + cards.length + ')';
+                            } else {
+                                badge.innerText = 'Open Bets (' + matchCount + ' of ' + cards.length + ' matching)';
+                            }
+                        }
+                        
+                        var noMatch = root.querySelector('#live-no-matches-box');
+                        if (noMatch) {
+                            noMatch.style.display = (matchCount === 0 && cards.length > 0) ? 'block' : 'none';
+                            var qSpan = root.querySelector('#live-search-query-display');
+                            if (qSpan) qSpan.innerText = raw;
+                        }
+                    })(this);"
                 />
                 <span 
                     id="clear-search-btn"
-                    onclick="var el=document.getElementById('live-open-bets-search-input'); if(el){ el.value=''; if(window.runLiveBetSearch) window.runLiveBetSearch(); el.focus(); }"
+                    onclick="(function(){
+                        var el = document.getElementById('live-open-bets-search-input');
+                        if (el) {
+                            el.value = '';
+                            el.dispatchEvent(new Event('input', { bubbles: true }));
+                            el.focus();
+                        }
+                    })();"
                     style="
                         position: absolute; 
                         right: 12px; 
@@ -580,6 +625,10 @@ elif nav_selection == "Bankroll & Ledger":
                     title="Clear search"
                 >✕</span>
             </div>
+            <img src="data:image/gif;base64,R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7" style="display:none;" onload="(function(){
+                var el = document.getElementById('live-open-bets-search-input');
+                if (el && el.value) el.dispatchEvent(new Event('input', { bubbles: true }));
+            })();" />
             """, unsafe_allow_html=True)
             
         with s_col2:
@@ -687,70 +736,6 @@ elif nav_selection == "Bankroll & Ledger":
                     st.rerun()
 
             st.markdown(f"<div class='open-bet-divider' data-bet-id='{bid}'><hr style='border:0; border-top: 1px dashed #1e293b; margin: 12px 0;'></div>", unsafe_allow_html=True)
-
-        # Inject Instant JavaScript Search Engine
-        st.markdown("""
-        <script>
-        (function() {
-            function runFilter() {
-                var searchInput = document.getElementById('live-open-bets-search-input');
-                if (!searchInput) return;
-                var rawVal = searchInput.value || '';
-                var query = rawVal.toLowerCase().trim().replace(/^#/, '');
-                var cards = document.querySelectorAll('.open-bet-card');
-                var visibleCount = 0;
-
-                cards.forEach(function(card) {
-                    var bid = card.getAttribute('data-bet-id');
-                    var searchData = (card.getAttribute('data-search') || '').toLowerCase();
-                    var isMatch = !query || searchData.indexOf(query) !== -1;
-
-                    card.style.display = isMatch ? '' : 'none';
-
-                    var btn = document.querySelector('button[data-testid*="res_win_' + bid + '"], [key="res_win_' + bid + '"]');
-                    if (btn) {
-                        var btnRow = btn.closest('[data-testid="stHorizontalBlock"]') || btn.closest('.stHorizontalBlock') || btn.parentElement.parentElement;
-                        if (btnRow) {
-                            btnRow.style.display = isMatch ? '' : 'none';
-                        }
-                    }
-
-                    var divider = document.querySelector('.open-bet-divider[data-bet-id="' + bid + '"]');
-                    if (divider) {
-                        divider.style.display = isMatch ? '' : 'none';
-                    }
-
-                    if (isMatch) visibleCount++;
-                });
-
-                var badge = document.getElementById('open-bets-header-count');
-                if (badge) {
-                    if (!query) {
-                        badge.innerText = 'Open Bets (' + cards.length + ')';
-                    } else {
-                        badge.innerText = 'Open Bets (' + visibleCount + ' of ' + cards.length + ' matching)';
-                    }
-                }
-
-                var noMatch = document.getElementById('live-no-matches-box');
-                if (noMatch) {
-                    noMatch.style.display = (visibleCount === 0 && cards.length > 0) ? 'block' : 'none';
-                    var querySpan = document.getElementById('live-search-query-display');
-                    if (querySpan) querySpan.innerText = rawVal;
-                }
-            }
-
-            window.runLiveBetSearch = runFilter;
-
-            var inputEl = document.getElementById('live-open-bets-search-input');
-            if (inputEl) {
-                inputEl.addEventListener('input', runFilter);
-                inputEl.addEventListener('keyup', runFilter);
-            }
-            setTimeout(runFilter, 50);
-        })();
-        </script>
-        """, unsafe_allow_html=True)
 
     metrics = BankrollLedger.get_ledger_metrics()
 
