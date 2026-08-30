@@ -304,12 +304,15 @@ if nav_selection == "Matchup Forecast":
     team_list = list(teams_dict.keys())
     team_options = {k: f"{v['name']} ({v['abbrev']})" for k, v in teams_dict.items()}
 
+    default_h_idx = 2 if len(team_list) > 2 else (1 if len(team_list) > 0 else 0)
+    default_a_idx = 10 if len(team_list) > 10 else (1 if len(team_list) > 0 else 0)
+
     with mc_h_col:
         home_team_id = st.selectbox(
             f"Home Team ({sport_label})",
             options=[None] + team_list,
             format_func=lambda x: "-- Select Home Team --" if x is None else team_options[x],
-            index=0,
+            index=default_h_idx,
             key=f"mf_home_team_{sport}"
         )
 
@@ -318,7 +321,7 @@ if nav_selection == "Matchup Forecast":
             f"Away Team ({sport_label})",
             options=[None] + team_list,
             format_func=lambda x: "-- Select Away Team --" if x is None else team_options[x],
-            index=0,
+            index=default_a_idx,
             key=f"mf_away_team_{sport}"
         )
 
@@ -971,9 +974,21 @@ elif nav_selection == "Team Explorer":
     exp_team_opts = {k: f"{v['name']} ({v['abbrev']})" for k, v in exp_teams.items()}
 
     with exp_t1_col:
-        t1_sel = st.selectbox(f"Team 1 ({exp_sport_label})", options=[None] + exp_team_list, format_func=lambda x: "-- Select Team 1 --" if x is None else exp_team_opts[x], index=0, key=f"exp_t1_{exp_sport}")
+        t1_sel = st.selectbox(
+            f"Team 1 ({exp_sport_label})",
+            options=[None] + exp_team_list,
+            format_func=lambda x: "-- Select Team 1 --" if x is None else exp_team_opts[x],
+            index=1 if len(exp_team_list) > 0 else 0,
+            key=f"exp_t1_{exp_sport}"
+        )
     with exp_t2_col:
-        t2_sel = st.selectbox(f"Team 2 ({exp_sport_label})", options=[None] + exp_team_list, format_func=lambda x: "-- Select Team 2 (Optional) --" if x is None else exp_team_opts[x], index=0, key=f"exp_t2_{exp_sport}")
+        t2_sel = st.selectbox(
+            f"Team 2 ({exp_sport_label})",
+            options=[None] + exp_team_list,
+            format_func=lambda x: "-- Select Team 2 (Optional) --" if x is None else exp_team_opts[x],
+            index=2 if len(exp_team_list) > 1 else 0,
+            key=f"exp_t2_{exp_sport}"
+        )
 
     st.markdown("</div>", unsafe_allow_html=True)
 
